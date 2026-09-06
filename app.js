@@ -382,6 +382,74 @@ function closeBrowseModal() {
   document.getElementById("browse-modal").classList.remove("open");
 }
 
+// ---------- 過去の日記を見る ----------
+
+async function githubListFolder(settings, folderPath) {
+  const url = `https://api.github.com/repos/${settings.owner}/${settings.repo}/contents/${folderPath}?ref=${settings.branch}`;
+  const res = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${settings.pat}`,
+      Accept: "application/vnd.github+json",
+    },
+  });
+  if (!res.ok) throw new Error(`一覧取得エラー: ${res.status}`);
+  return res.json();
+}
+
+async function openViewModal() {
+  const settings = loadSettings();
+  if (!settings || !settings.pat) {
+    setStatus("先に設定(⚙️)を入力してください");
+    openSettings();
+    return;
+  }
+  document.getElementById("viewModalTitle").textContent = "過去の日記";
+  document.getElementById("viewContent").style.display = "none";
+  const listEl = document.getElementById("viewDateList");
+  listEl.innerHTML = "読み込み中...";
+  document.getElementById("view-modal").classList.add("open");
+
+  try {
+    const files = await githubListFolder(settings, settings.path);
+    const mdFiles = files
+      .filter((f) => f.name.endsWith(".md"))
+      .sort((a, b) => (a.name < b.name ? 1 : -1));
+
+    listEl.innerHTML = "";
+    mdFiles.forEach((f) => {
+      const btn = document.createElement("button");
+      btn.className = "browse-q-item";
+      btn.textContent = f.name.replace(".md", "");
+      btn.addEventListener("click", () => showEntry(settings, f.path, f.name));
+      listEl.appendChild(btn);
+    });
+    if (mdFiles.length === 0) listEl.textContent = "まだ日記がありません";
+  } catch (e) {
+    listEl.textContent = "エラー: " + e.message;
+  }
+}
+
+async function showEntry(settings, filePath, fileName) {
+  const listEl = document.getElementById("viewDateList");
+  const contentEl = document.getElementById("viewContent");
+  listEl.style.display = "none";
+  contentEl.style.display = "block";
+  contentEl.textContent = "読み込み中...";
+  document.getElementById("viewModalTitle").textContent = fileName.replace(".md", "");
+  try {
+    const { content } = await githubGetFile(settings, filePath);
+    contentEl.textContent = content || "(空)";
+  } catch (e) {
+    contentEl.textContent = "エラー: " + e.message;
+  }
+}
+
+function closeViewModal() {
+  document.getElementById("view-modal").classList.remove("open");
+  document.getElementById("viewDateList").style.display = "block";
+  document.getElementById("viewContent").style.display = "none";
+}
+
 // ---------- 初期化 ----------
 
 document.getElementById("gearBtn").addEventListener("click", openSettings);
@@ -389,6 +457,8 @@ document.getElementById("saveSettingsBtn").addEventListener("click", closeSettin
 document.getElementById("addQuestionBtn").addEventListener("click", addQuestionCard);
 document.getElementById("browseQuestionsBtn").addEventListener("click", openBrowseModal);
 document.getElementById("closeBrowseBtn").addEventListener("click", closeBrowseModal);
+document.getElementById("viewPastBtn").addEventListener("click", openViewModal);
+document.getElementById("closeViewBtn").addEventListener("click", closeViewModal);
 document.getElementById("saveBtn").addEventListener("click", handleSave);
 
 addQuestionCard();

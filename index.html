@@ -238,6 +238,19 @@
 
   <button class="save-btn" id="saveBtn">今日のノートに保存</button>
   <div id="status"></div>
+
+  <button class="add-question-btn" id="viewPastBtn" style="margin-top:10px;">📖 過去の日記を見る</button>
+
+  <div id="view-modal" class="modal-overlay">
+    <div class="modal-box">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+        <strong id="viewModalTitle">過去の日記</strong>
+        <button id="closeViewBtn" style="background:none;border:none;font-size:1.3rem;">✕</button>
+      </div>
+      <div id="viewDateList"></div>
+      <pre id="viewContent" style="white-space:pre-wrap; font-size:0.9rem; display:none;"></pre>
+    </div>
+  </div>
 </div>
 
 <div id="settings-panel">

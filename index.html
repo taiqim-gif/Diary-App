@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>規格外さん日記</title>
+<link rel="manifest" href="manifest.json">
+<style>
+  :root {
+    --bg: #f7f5f2;
+    --card: #ffffff;
+    --accent: #4a4a8a;
+    --text: #2b2b2b;
+    --muted: #8a8a8a;
+    --border: #e3e0da;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    padding: env(safe-area-inset-top) 16px env(safe-area-inset-bottom);
+  }
+  header {
+    padding: 20px 0 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  h1 { font-size: 1.2rem; margin: 0; }
+  .gear {
+    font-size: 1.4rem;
+    background: none;
+    border: none;
+    cursor: pointer;
+  }
+  .card {
+    background: var(--card);
+    border-radius: 14px;
+    padding: 16px;
+    margin-bottom: 14px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    border: 1px solid var(--border);
+  }
+  .cat-label {
+    display: inline-block;
+    font-size: 0.75rem;
+    color: var(--accent);
+    background: #ecebf7;
+    padding: 3px 10px;
+    border-radius: 999px;
+    margin-bottom: 8px;
+  }
+  .question-text {
+    font-size: 1.05rem;
+    line-height: 1.6;
+    margin: 0 0 12px;
+  }
+  button.reroll {
+    background: none;
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    padding: 8px 14px;
+    border-radius: 999px;
+    font-size: 0.85rem;
+  }
+  textarea {
+    width: 100%;
+    min-height: 90px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px;
+    font-size: 1rem;
+    font-family: inherit;
+    resize: vertical;
+    background: #fcfcfb;
+  }
+  label.field-label {
+    display: block;
+    font-size: 0.85rem;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+  .save-btn {
+    width: 100%;
+    padding: 14px;
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-size: 1.05rem;
+    font-weight: 600;
+    margin-top: 4px;
+  }
+  .save-btn:disabled { opacity: 0.5; }
+  #status {
+    text-align: center;
+    padding: 10px;
+    font-size: 0.9rem;
+    color: var(--muted);
+    min-height: 1.4em;
+  }
+  #settings-panel {
+    display: none;
+  }
+  #settings-panel.open { display: block; }
+  #main-panel.hidden { display: none; }
+  input[type=text], input[type=password] {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 1rem;
+    margin-bottom: 10px;
+  }
+  .condition-row {
+    display: flex;
+    gap: 12px;
+  }
+  .condition-col { flex: 1; }
+  select, input[type=number] {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 1rem;
+    background: #fcfcfb;
+  }
+  .add-question-btn {
+    width: 100%;
+    padding: 12px;
+    background: #ecebf7;
+    color: var(--accent);
+    border: 1px dashed var(--accent);
+    border-radius: 12px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    margin-bottom: 16px;
+  }
+  .hint {
+    font-size: 0.78rem;
+    color: var(--muted);
+    margin: -4px 0 10px;
+  }
+  .close-settings {
+    background: var(--accent);
+    color: white;
+    border: none;
+    padding: 12px;
+    border-radius: 10px;
+    width: 100%;
+    font-size: 1rem;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>規格外さん日記</h1>
+  <button class="gear" id="gearBtn">⚙️</button>
+</header>
+
+<div id="main-panel">
+  <div class="card">
+    <label class="field-label">今日のコンディション</label>
+    <div class="condition-row">
+      <div class="condition-col">
+        <label class="field-label">体調</label>
+        <select id="conditionSelect">
+          <option value="">選択しない</option>
+          <option value="絶好調">絶好調</option>
+          <option value="良い">良い</option>
+          <option value="普通">普通</option>
+          <option value="やや不調">やや不調</option>
+          <option value="不調">不調</option>
+        </select>
+      </div>
+      <div class="condition-col">
+        <label class="field-label">睡眠時間(h)</label>
+        <input type="number" id="sleepInput" step="0.5" min="0" max="24" placeholder="例: 6.5">
+      </div>
+    </div>
+  </div>
+
+  <div id="questionCards"></div>
+  <button class="add-question-btn" id="addQuestionBtn">＋ 質問を追加</button>
+  <div class="card">
+    <label class="field-label">自由記述(任意)</label>
+    <textarea id="freeText" placeholder="今日あったことを自由に"></textarea>
+  </div>
+
+  <button class="save-btn" id="saveBtn">今日のノートに保存</button>
+  <div id="status"></div>
+</div>
+
+<div id="settings-panel">
+  <div class="card">
+    <label class="field-label">GitHub Personal Access Token</label>
+    <input type="password" id="patInput" placeholder="github_pat_...">
+    <label class="field-label">リポジトリオーナー</label>
+    <input type="text" id="ownerInput" placeholder="taiqim-gif">
+    <label class="field-label">リポジトリ名</label>
+    <input type="text" id="repoInput" placeholder="obsidian-sync">
+    <label class="field-label">ブランチ</label>
+    <input type="text" id="branchInput" placeholder="main">
+    <label class="field-label">Daily Noteの保存先フォルダ</label>
+    <input type="text" id="pathInput" placeholder="01_Daily">
+    <p class="hint">Fine-grained PATは対象リポジトリのContentsをRead and writeに設定して発行してください。この情報はこの端末のブラウザ内にのみ保存されます。</p>
+    <button class="close-settings" id="saveSettingsBtn">保存して閉じる</button>
+  </div>
+</div>
+
+<script src="questions.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

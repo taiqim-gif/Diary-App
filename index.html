@@ -138,6 +138,39 @@
     font-weight: 600;
     margin-bottom: 16px;
   }
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.4);
+    z-index: 50;
+    align-items: flex-end;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal-box {
+    background: var(--card);
+    width: 100%;
+    max-height: 75vh;
+    overflow-y: auto;
+    border-radius: 18px 18px 0 0;
+    padding: 18px 16px calc(18px + env(safe-area-inset-bottom));
+  }
+  .browse-cat-title {
+    font-size: 0.8rem;
+    color: var(--accent);
+    margin: 14px 0 6px;
+    font-weight: 600;
+  }
+  .browse-q-item {
+    width: 100%;
+    text-align: left;
+    background: #fcfcfb;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px;
+    margin-bottom: 6px;
+    font-size: 0.92rem;
+  }
   .hint {
     font-size: 0.78rem;
     color: var(--muted);
@@ -184,7 +217,20 @@
   </div>
 
   <div id="questionCards"></div>
-  <button class="add-question-btn" id="addQuestionBtn">＋ 質問を追加</button>
+  <div style="display:flex; gap:10px; margin-bottom:16px;">
+    <button class="add-question-btn" id="addQuestionBtn" style="flex:1;">＋ 質問を追加</button>
+    <button class="add-question-btn" id="browseQuestionsBtn" style="flex:1;">📋 質問一覧</button>
+  </div>
+
+  <div id="browse-modal" class="modal-overlay">
+    <div class="modal-box">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+        <strong>質問一覧から選ぶ</strong>
+        <button id="closeBrowseBtn" style="background:none;border:none;font-size:1.3rem;">✕</button>
+      </div>
+      <div id="browseList"></div>
+    </div>
+  </div>
   <div class="card">
     <label class="field-label">自由記述(任意)</label>
     <textarea id="freeText" placeholder="今日あったことを自由に"></textarea>

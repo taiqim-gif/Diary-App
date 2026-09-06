@@ -351,11 +351,44 @@ async function handleSave() {
   }
 }
 
+// ---------- 質問一覧モーダル ----------
+
+function openBrowseModal() {
+  const listEl = document.getElementById("browseList");
+  listEl.innerHTML = "";
+  CATEGORY_ORDER.forEach((cat) => {
+    const title = document.createElement("div");
+    title.className = "browse-cat-title";
+    title.textContent = cat;
+    listEl.appendChild(title);
+
+    QUESTIONS.filter((q) => q.cat === cat).forEach((q) => {
+      const btn = document.createElement("button");
+      btn.className = "browse-q-item";
+      btn.textContent = q.text;
+      btn.addEventListener("click", () => {
+        const id = ++cardSeq;
+        questionCards.push({ id, question: q });
+        renderQuestionCards();
+        closeBrowseModal();
+      });
+      listEl.appendChild(btn);
+    });
+  });
+  document.getElementById("browse-modal").classList.add("open");
+}
+
+function closeBrowseModal() {
+  document.getElementById("browse-modal").classList.remove("open");
+}
+
 // ---------- 初期化 ----------
 
 document.getElementById("gearBtn").addEventListener("click", openSettings);
 document.getElementById("saveSettingsBtn").addEventListener("click", closeSettings);
 document.getElementById("addQuestionBtn").addEventListener("click", addQuestionCard);
+document.getElementById("browseQuestionsBtn").addEventListener("click", openBrowseModal);
+document.getElementById("closeBrowseBtn").addEventListener("click", closeBrowseModal);
 document.getElementById("saveBtn").addEventListener("click", handleSave);
 
 addQuestionCard();

@@ -9,15 +9,8 @@ const CATEGORY_ORDER = [
   "5. コミットメント",
 ];
 
-const FIXED_QUESTIONS = {
-  "1. 基本の振り返り": ["今日最も印象に残った出来事は？", "そこから得た気づきは？"],
-  "2. 自己躾け": ["今日の自分に教えたいこと・言い聞かせたいことは？", "明日の自分への宣言は？"],
-  "3. 理想と現実のギャップ": ["理想の自分との差はどこにあるか？", "その差を埋める明日の「微差の行動」は？"],
-  "4. 言語化・構造化": ["今日の経験を「○○で大切なことは全て○○から教わった」で表現すると？"],
-  "5. コミットメント": ["今日強まった決意・自己暗示は？"],
-};
-
-let questionCards = []; // { id, question: {cat, text} }
+let questionCards = []; // { id, question: {cat, text}, answer }
+let selectedFreeTags = [];
 let cardSeq = 0;
 
 // ---------- ユーティリティ ----------
@@ -54,6 +47,11 @@ function setStatus(msg) {
 
 function randomQuestion() {
   return QUESTIONS[Math.floor(Math.random() * QUESTIONS.length)];
+}
+
+function randomQuestionInCategory(cat) {
+  const list = QUESTIONS.filter((q) => q.cat === cat);
+  return list[Math.floor(Math.random() * list.length)];
 }
 
 // ---------- 設定 ----------
@@ -93,10 +91,19 @@ function closeSettings() {
 
 // ---------- 質問カードUI ----------
 
-function addQuestionCard() {
+function addQuestionCard(cat) {
   const id = ++cardSeq;
-  const question = randomQuestion();
-  questionCards.push({ id, question });
+  const question = randomQuestionInCategory(cat);
+  questionCards.push({ id, question, answer: "" });
+  renderQuestionCards();
+}
+
+function initDefaultCards() {
+  questionCards = [];
+  CATEGORY_ORDER.forEach((cat) => {
+    const id = ++cardSeq;
+    questionCards.push({ id, question: randomQuestionInCategory(cat), answer: "" });
+  });
   renderQuestionCards();
 }
 
@@ -104,6 +111,10 @@ function removeQuestionCard(id) {
   if (questionCards.length <= 1) return;
   questionCards = questionCards.filter((c) => c.id !== id);
   renderQuestionCards();
+}
+
+function escapeHtml(str) {
+  return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 function renderQuestionCards() {
@@ -119,23 +130,37 @@ function renderQuestionCards() {
     card.innerHTML = `
       <span class="cat-label">${c.question.cat}</span>
       <p class="question-text">${c.question.text}</p>
-      <textarea data-card-id="${c.id}" class="answer-input" placeholder="ここに書く"></textarea>
-      <div style="margin-top:8px; display:flex; gap:8px;">
-        <button class="reroll reroll-single" data-card-id="${c.id}">🔄 別の質問</button>
+      <textarea data-card-id="${c.id}" class="answer-input" placeholder="ここに書く">${escapeHtml(c.answer || "")}</textarea>
+      <div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap;">
+        <button class="reroll reroll-single" data-card-id="${c.id}">🔄 この項目で別の質問</button>
+        <button class="reroll add-single" data-cat="${c.question.cat}">＋ この項目に追加</button>
         ${deleteBtnHtml}
       </div>
     `;
     container.appendChild(card);
   });
 
+  container.querySelectorAll(".answer-input").forEach((el) => {
+    el.addEventListener("input", () => {
+      const id = Number(el.dataset.cardId);
+      const card = questionCards.find((c) => c.id === id);
+      if (card) card.answer = el.value;
+    });
+  });
   container.querySelectorAll(".reroll-single").forEach((btn) => {
     btn.addEventListener("click", () => {
       const id = Number(btn.dataset.cardId);
       const card = questionCards.find((c) => c.id === id);
       if (card) {
-        card.question = randomQuestion();
+        card.question = randomQuestionInCategory(card.question.cat);
+        card.answer = "";
         renderQuestionCards();
       }
+    });
+  });
+  container.querySelectorAll(".add-single").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      addQuestionCard(btn.dataset.cat);
     });
   });
   container.querySelectorAll(".remove-card").forEach((btn) => {
@@ -146,25 +171,17 @@ function renderQuestionCards() {
 }
 
 function getAnswerFor(cardId) {
-  const el = document.querySelector(`.answer-input[data-card-id="${cardId}"]`);
-  return el ? el.value.trim() : "";
+  const card = questionCards.find((c) => c.id === cardId);
+  return card && card.answer ? card.answer.trim() : "";
 }
 
 // ---------- 本文組み立て ----------
 
 function buildSkeleton(dateStr) {
   const year = dateStr.slice(0, 4);
-  let out = `# ${dateStr} の日記\n\n`;
-  for (const cat of CATEGORY_ORDER) {
-    out += `## ${cat}\n`;
-    for (const q of FIXED_QUESTIONS[cat]) {
-      out += `- ${q}\n`;
-    }
-    out += `\n`;
-  }
-  out += `## 自由記述\n\n`;
-  out += `---\nタグ: #日記 #${year} #自己分析\n`;
-  return out;
+  // 未回答の質問や空のセクション見出しは含めない。
+  // 回答があったカテゴリのセクションだけ、保存時に insertIntoSection が動的に追加する。
+  return `# ${dateStr} の日記\n\n---\nタグ: #日記 #${year} #自己分析\n`;
 }
 
 function insertConditionLine(content, conditionText) {
@@ -214,8 +231,9 @@ function appendSectionBeforeTags(content, heading, block) {
   return [...before, ...after].join("\n");
 }
 
-function appendFreeText(content, freeText) {
-  const block = `- (${timeStr()}) ${freeText}`;
+function appendFreeText(content, freeText, tags) {
+  const tagStr = tags && tags.length ? ` [タグ: ${tags.join(", ")}]` : "";
+  const block = `- (${timeStr()})${tagStr} ${freeText}`;
   const lines = content.split("\n");
   const headingLine = "## 自由記述";
   let startIdx = lines.findIndex((l) => l.trim() === headingLine);
@@ -321,7 +339,7 @@ async function handleSave() {
 
     const freeText = document.getElementById("freeText").value.trim();
     if (freeText) {
-      newContent = appendFreeText(newContent, freeText);
+      newContent = appendFreeText(newContent, freeText, selectedFreeTags);
       hasAnyInput = true;
     }
 
@@ -341,13 +359,46 @@ async function handleSave() {
 
     setStatus("保存しました ✓");
     document.getElementById("freeText").value = "";
+    selectedFreeTags = [];
+    document.getElementById("tagPicker").classList.remove("open");
     questionCards = [];
-    addQuestionCard();
+    initDefaultCards();
   } catch (e) {
     console.error(e);
     setStatus("エラー: " + e.message);
   } finally {
     saveBtn.disabled = false;
+  }
+}
+
+// ---------- 自由記述タグ ----------
+
+function renderTagPicker() {
+  const picker = document.getElementById("tagPicker");
+  picker.innerHTML = "";
+  CATEGORY_ORDER.forEach((cat) => {
+    const pill = document.createElement("button");
+    pill.className = "tag-pill" + (selectedFreeTags.includes(cat) ? " selected" : "");
+    pill.textContent = cat;
+    pill.addEventListener("click", () => {
+      if (selectedFreeTags.includes(cat)) {
+        selectedFreeTags = selectedFreeTags.filter((t) => t !== cat);
+      } else {
+        selectedFreeTags.push(cat);
+      }
+      renderTagPicker();
+    });
+    picker.appendChild(pill);
+  });
+}
+
+function toggleTagPicker() {
+  const picker = document.getElementById("tagPicker");
+  if (picker.classList.contains("open")) {
+    picker.classList.remove("open");
+  } else {
+    renderTagPicker();
+    picker.classList.add("open");
   }
 }
 
@@ -454,14 +505,14 @@ function closeViewModal() {
 
 document.getElementById("gearBtn").addEventListener("click", openSettings);
 document.getElementById("saveSettingsBtn").addEventListener("click", closeSettings);
-document.getElementById("addQuestionBtn").addEventListener("click", addQuestionCard);
 document.getElementById("browseQuestionsBtn").addEventListener("click", openBrowseModal);
+document.getElementById("tagToggleBtn").addEventListener("click", toggleTagPicker);
 document.getElementById("closeBrowseBtn").addEventListener("click", closeBrowseModal);
 document.getElementById("viewPastBtn").addEventListener("click", openViewModal);
 document.getElementById("closeViewBtn").addEventListener("click", closeViewModal);
 document.getElementById("saveBtn").addEventListener("click", handleSave);
 
-addQuestionCard();
+initDefaultCards();
 if (!loadSettings()) {
   openSettings();
 }

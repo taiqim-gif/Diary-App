@@ -100,10 +100,9 @@ function addQuestionCard(cat) {
 
 function initDefaultCards() {
   questionCards = [];
-  CATEGORY_ORDER.forEach((cat) => {
-    const id = ++cardSeq;
-    questionCards.push({ id, question: randomQuestionInCategory(cat), answer: "" });
-  });
+  const cat = CATEGORY_ORDER[Math.floor(Math.random() * CATEGORY_ORDER.length)];
+  const id = ++cardSeq;
+  questionCards.push({ id, question: randomQuestionInCategory(cat), answer: "" });
   renderQuestionCards();
 }
 

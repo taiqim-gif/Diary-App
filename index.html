@@ -171,6 +171,49 @@
     margin-bottom: 6px;
     font-size: 0.92rem;
   }
+  .tag-picker {
+    margin-top: 10px;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .tag-picker.open { display: flex !important; }
+  .tag-pill {
+    padding: 6px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: #fcfcfb;
+    font-size: 0.8rem;
+    color: var(--text);
+  }
+  .tag-pill.selected {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+  }
+  .modal-header {
+    position: sticky;
+    top: 0;
+    background: var(--card);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+    z-index: 1;
+  }
+  .modal-close-btn {
+    background: #f1f0ec;
+    border: none;
+    font-size: 1.2rem;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    line-height: 1;
+  }
+  .cat-label-clickable {
+    cursor: pointer;
+  }
   .hint {
     font-size: 0.78rem;
     color: var(--muted);
@@ -216,6 +259,13 @@
     </div>
   </div>
 
+  <div class="card">
+    <label class="field-label">自由記述(任意)</label>
+    <textarea id="freeText" placeholder="今日あったことを自由に"></textarea>
+    <button class="reroll" id="tagToggleBtn" style="margin-top:8px;">🏷️ タグ付け</button>
+    <div id="tagPicker" class="tag-picker" style="display:none;"></div>
+  </div>
+
   <div id="questionCards"></div>
   <div style="display:flex; gap:10px; margin-bottom:16px;">
     <button class="add-question-btn" id="browseQuestionsBtn" style="flex:1;">📋 質問一覧から選ぶ</button>
@@ -223,16 +273,12 @@
 
   <div id="browse-modal" class="modal-overlay">
     <div class="modal-box">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+      <div class="modal-header">
         <strong>質問一覧から選ぶ</strong>
-        <button id="closeBrowseBtn" style="background:none;border:none;font-size:1.3rem;">✕</button>
+        <button id="closeBrowseBtn" class="modal-close-btn">✕</button>
       </div>
       <div id="browseList"></div>
     </div>
-  </div>
-  <div class="card">
-    <label class="field-label">自由記述(任意)</label>
-    <textarea id="freeText" placeholder="今日あったことを自由に"></textarea>
   </div>
 
   <button class="save-btn" id="saveBtn">今日のノートに保存</button>
@@ -242,9 +288,9 @@
 
   <div id="view-modal" class="modal-overlay">
     <div class="modal-box">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+      <div class="modal-header">
         <strong id="viewModalTitle">過去の日記</strong>
-        <button id="closeViewBtn" style="background:none;border:none;font-size:1.3rem;">✕</button>
+        <button id="closeViewBtn" class="modal-close-btn">✕</button>
       </div>
       <div id="viewDateList"></div>
       <pre id="viewContent" style="white-space:pre-wrap; font-size:0.9rem; display:none;"></pre>

@@ -128,7 +128,7 @@ function renderQuestionCards() {
         ? `<button class="reroll remove-card" data-card-id="${c.id}">✕ 削除</button>`
         : "";
     card.innerHTML = `
-      <span class="cat-label">${c.question.cat}</span>
+      <span class="cat-label cat-label-clickable" data-card-id="${c.id}">${c.question.cat} 🔀</span>
       <p class="question-text">${c.question.text}</p>
       <textarea data-card-id="${c.id}" class="answer-input" placeholder="ここに書く">${escapeHtml(c.answer || "")}</textarea>
       <div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap;">
@@ -138,6 +138,20 @@ function renderQuestionCards() {
       </div>
     `;
     container.appendChild(card);
+  });
+
+  container.querySelectorAll(".cat-label-clickable").forEach((el) => {
+    el.addEventListener("click", () => {
+      const id = Number(el.dataset.cardId);
+      const card = questionCards.find((c) => c.id === id);
+      if (card) {
+        const others = CATEGORY_ORDER.filter((c2) => c2 !== card.question.cat);
+        const newCat = others[Math.floor(Math.random() * others.length)];
+        card.question = randomQuestionInCategory(newCat);
+        card.answer = "";
+        renderQuestionCards();
+      }
+    });
   });
 
   container.querySelectorAll(".answer-input").forEach((el) => {

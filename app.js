@@ -1,5 +1,10 @@
-// 規格外さん日記 - アプリ本体
+// 規格外さん日記 - アプリ本体(循環対応版)
+// 変更点: ①frontmatter(date/sleep/condition/links/tags) ②分析シート由来の質問 ③保存先の既定を diary に
 const SETTINGS_KEY = "shinkaronDiarySettings";
+const DEFAULT_PATH = "diary";
+// 分析シート由来の質問プール(同じリポジトリ内)。形式: [{ "cell": "41d736e1", "q": "質問文" }]
+const ANALYSIS_QUESTIONS_PATH = "analysis/questions.json";
+const ANALYSIS_CAT = "6. 分析シート由来";
 
 const CATEGORY_ORDER = [
   "1. 基本の振り返り",
@@ -9,7 +14,8 @@ const CATEGORY_ORDER = [
   "5. コミットメント",
 ];
 
-let questionCards = []; // { id, question: {cat, text}, answer }
+let questionCards = []; // { id, question: {cat, text, cell?}, answer }
+let analysisQuestions = []; // { cat: ANALYSIS_CAT, text, cell }
 let selectedFreeTags = [];
 let cardSeq = 0;
 
@@ -45,12 +51,19 @@ function setStatus(msg) {
   document.getElementById("status").textContent = msg;
 }
 
-function randomQuestion() {
-  return QUESTIONS[Math.floor(Math.random() * QUESTIONS.length)];
+// 質問プール: 分析シート由来が空なら通常プールを使う
+function poolFor(cat) {
+  if (cat === ANALYSIS_CAT) return analysisQuestions;
+  return QUESTIONS.filter((q) => q.cat === cat);
+}
+
+function allCategories() {
+  return analysisQuestions.length > 0 ? [...CATEGORY_ORDER, ANALYSIS_CAT] : CATEGORY_ORDER;
 }
 
 function randomQuestionInCategory(cat) {
-  const list = QUESTIONS.filter((q) => q.cat === cat);
+  const list = poolFor(cat);
+  if (list.length === 0) return QUESTIONS[Math.floor(Math.random() * QUESTIONS.length)];
   return list[Math.floor(Math.random() * list.length)];
 }
 
@@ -71,7 +84,7 @@ function openSettings() {
   document.getElementById("ownerInput").value = s.owner || "";
   document.getElementById("repoInput").value = s.repo || "";
   document.getElementById("branchInput").value = s.branch || "main";
-  document.getElementById("pathInput").value = s.path || "01_Daily";
+  document.getElementById("pathInput").value = s.path || DEFAULT_PATH;
   document.getElementById("settings-panel").classList.add("open");
   document.getElementById("main-panel").classList.add("hidden");
 }
@@ -82,11 +95,12 @@ function closeSettings() {
     owner: document.getElementById("ownerInput").value.trim(),
     repo: document.getElementById("repoInput").value.trim(),
     branch: document.getElementById("branchInput").value.trim() || "main",
-    path: document.getElementById("pathInput").value.trim() || "01_Daily",
+    path: document.getElementById("pathInput").value.trim() || DEFAULT_PATH,
   };
   saveSettingsToStorage(s);
   document.getElementById("settings-panel").classList.remove("open");
   document.getElementById("main-panel").classList.remove("hidden");
+  loadAnalysisQuestions(); // 設定変更後に質問プールを再取得
 }
 
 // ---------- 質問カードUI ----------
@@ -100,7 +114,8 @@ function addQuestionCard(cat) {
 
 function initDefaultCards() {
   questionCards = [];
-  const cat = CATEGORY_ORDER[Math.floor(Math.random() * CATEGORY_ORDER.length)];
+  const cats = allCategories();
+  const cat = cats[Math.floor(Math.random() * cats.length)];
   const id = ++cardSeq;
   questionCards.push({ id, question: randomQuestionInCategory(cat), answer: "" });
   renderQuestionCards();
@@ -144,7 +159,7 @@ function renderQuestionCards() {
       const id = Number(el.dataset.cardId);
       const card = questionCards.find((c) => c.id === id);
       if (card) {
-        const others = CATEGORY_ORDER.filter((c2) => c2 !== card.question.cat);
+        const others = allCategories().filter((c2) => c2 !== card.question.cat);
         const newCat = others[Math.floor(Math.random() * others.length)];
         card.question = randomQuestionInCategory(newCat);
         card.answer = "";
@@ -188,12 +203,58 @@ function getAnswerFor(cardId) {
   return card && card.answer ? card.answer.trim() : "";
 }
 
+// ---------- frontmatter ----------
+
+// 先頭の --- ... --- を切り出す。無ければ fm は空配列(既存の旧形式の日記)
+function splitFrontmatter(content) {
+  if (content.startsWith("---\n")) {
+    const end = content.indexOf("\n---\n", 4);
+    if (end !== -1) {
+      return {
+        fm: content.slice(4, end).split("\n"),
+        body: content.slice(end + 5).replace(/^\n+/, ""),
+      };
+    }
+  }
+  return { fm: [], body: content };
+}
+
+function joinFrontmatter(fm, body) {
+  return `---\n${fm.join("\n")}\n---\n\n${body}`;
+}
+
+function setFmField(fm, key, value) {
+  const i = fm.findIndex((l) => l.startsWith(key + ":"));
+  const line = `${key}: ${value}`;
+  if (i !== -1) fm[i] = line;
+  else fm.push(line);
+}
+
+function ensureFmField(fm, key, value) {
+  if (!fm.some((l) => l.startsWith(key + ":"))) fm.push(`${key}: ${value}`);
+}
+
+// links: [a, b] に新しいIDを重複なく追加
+function mergeLinks(fm, newIds) {
+  const i = fm.findIndex((l) => l.startsWith("links:"));
+  let ids = [];
+  if (i !== -1) {
+    const m = fm[i].match(/\[(.*)\]/);
+    if (m) ids = m[1].split(",").map((s) => s.trim()).filter(Boolean);
+  }
+  newIds.forEach((id) => {
+    if (id && !ids.includes(id)) ids.push(id);
+  });
+  const line = `links: [${ids.join(", ")}]`;
+  if (i !== -1) fm[i] = line;
+  else fm.push(line);
+}
+
 // ---------- 本文組み立て ----------
 
 function buildSkeleton(dateStr) {
   const year = dateStr.slice(0, 4);
-  // 未回答の質問や空のセクション見出しは含めない。
-  // 回答があったカテゴリのセクションだけ、保存時に insertIntoSection が動的に追加する。
+  // 本文のみ(frontmatterは保存時に付与)。回答があったカテゴリのセクションだけ動的に追加される。
   return `# ${dateStr} の日記\n\n---\nタグ: #日記 #${year} #自己分析\n`;
 }
 
@@ -307,6 +368,25 @@ async function githubPutFile(settings, filePath, content, sha, message) {
   }
 }
 
+// ---------- 分析シート由来の質問 ----------
+
+async function loadAnalysisQuestions() {
+  const settings = loadSettings();
+  if (!settings || !settings.pat || !settings.owner || !settings.repo) return;
+  try {
+    const { content } = await githubGetFile(settings, ANALYSIS_QUESTIONS_PATH);
+    if (content === null) return; // まだ無ければ通常の質問だけで動く
+    const list = JSON.parse(content);
+    analysisQuestions = list
+      .filter((x) => x && x.q && x.cell)
+      .map((x) => ({ cat: ANALYSIS_CAT, text: x.q, cell: String(x.cell) }));
+    // まだ何も入力していなければ、分析由来の質問も混ぜて引き直す
+    if (questionCards.every((c) => !c.answer)) initDefaultCards();
+  } catch (e) {
+    console.error("分析質問の読み込み失敗:", e); // 失敗しても日記入力は止めない
+  }
+}
+
 // ---------- 保存処理 ----------
 
 async function handleSave() {
@@ -323,10 +403,13 @@ async function handleSave() {
 
   try {
     const dateStr = todayStr();
-    const filePath = `${settings.path}/${dateStr}.md`;
+    const dir = settings.path || DEFAULT_PATH;
+    const filePath = `${dir}/${dateStr}.md`;
 
     const { content, sha } = await githubGetFile(settings, filePath);
-    let newContent = content !== null ? content : buildSkeleton(dateStr);
+    const raw = content !== null ? content : buildSkeleton(dateStr);
+    let { fm, body } = splitFrontmatter(raw);
+    let newContent = body;
 
     const condition = document.getElementById("conditionSelect").value;
     const sleep = document.getElementById("sleepInput").value;
@@ -338,14 +421,19 @@ async function handleSave() {
       if (sleep) parts.push(`睡眠時間: ${sleep}時間`);
       parts.push(`(${timeStr()})`);
       newContent = insertConditionLine(newContent, parts.join("　"));
+      if (condition) setFmField(fm, "condition", condition);
+      if (sleep) setFmField(fm, "sleep", sleep);
       hasAnyInput = true;
     }
 
+    const newLinks = [];
     for (const c of questionCards) {
       const answer = getAnswerFor(c.id);
       if (answer) {
-        const block = `- **Q:** ${c.question.text} (${timeStr()})\n  - ${answer}`;
+        const idMark = c.question.cell ? ` {#${c.question.cell}}` : "";
+        const block = `- **Q:** ${c.question.text}${idMark} (${timeStr()})\n  - ${answer}`;
         newContent = insertIntoSection(newContent, c.question.cat, block);
+        if (c.question.cell) newLinks.push(c.question.cell);
         hasAnyInput = true;
       }
     }
@@ -362,10 +450,16 @@ async function handleSave() {
       return;
     }
 
+    // frontmatter の仕上げ(旧形式の日記にも付与される)
+    if (!fm.some((l) => l.startsWith("date:"))) fm.unshift(`date: ${dateStr}`); // dateを先頭に
+    mergeLinks(fm, newLinks);
+    ensureFmField(fm, "tags", "[]"); // 週次でClaudeが付ける
+    const finalContent = joinFrontmatter(fm, newContent);
+
     await githubPutFile(
       settings,
       filePath,
-      newContent,
+      finalContent,
       sha,
       `diary: ${dateStr} app update`
     );
@@ -420,13 +514,13 @@ function toggleTagPicker() {
 function openBrowseModal() {
   const listEl = document.getElementById("browseList");
   listEl.innerHTML = "";
-  CATEGORY_ORDER.forEach((cat) => {
+  allCategories().forEach((cat) => {
     const title = document.createElement("div");
     title.className = "browse-cat-title";
     title.textContent = cat;
     listEl.appendChild(title);
 
-    QUESTIONS.filter((q) => q.cat === cat).forEach((q) => {
+    poolFor(cat).forEach((q) => {
       const btn = document.createElement("button");
       btn.className = "browse-q-item";
       btn.textContent = q.text;
@@ -474,7 +568,7 @@ async function openViewModal() {
   document.getElementById("view-modal").classList.add("open");
 
   try {
-    const files = await githubListFolder(settings, settings.path);
+    const files = await githubListFolder(settings, settings.path || DEFAULT_PATH);
     const mdFiles = files
       .filter((f) => f.name.endsWith(".md"))
       .sort((a, b) => (a.name < b.name ? 1 : -1));
@@ -528,4 +622,6 @@ document.getElementById("saveBtn").addEventListener("click", handleSave);
 initDefaultCards();
 if (!loadSettings()) {
   openSettings();
+} else {
+  loadAnalysisQuestions();
 }

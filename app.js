@@ -465,6 +465,7 @@ async function handleSave() {
     );
 
     setStatus("保存しました ✓");
+    catCache = null; // カテゴリ別一覧は次回開くときに読み直す
     document.getElementById("freeText").value = "";
     selectedFreeTags = [];
     document.getElementById("tagPicker").classList.remove("open");
@@ -608,6 +609,170 @@ function closeViewModal() {
   document.getElementById("viewContent").style.display = "none";
 }
 
+// ---------- カテゴリ別に見る ----------
+
+let catCache = null; // { all: [{cat,date,q,a}], fileCount, total }
+const CAT_LOAD_LIMIT = 90; // 新しい順にこの日数分まで読む
+
+// 日記ファイルを「見出し(カテゴリ)ごとの回答」に分解する
+function parseDiary(content, dateStr) {
+  const { body } = splitFrontmatter(content);
+  const out = [];
+  let cat = null;
+  let cur = null;
+  const flush = () => {
+    if (cur && cat) out.push({ cat, date: dateStr, q: cur.q, a: cur.a.join("\n").trim() });
+    cur = null;
+  };
+  body.split("\n").forEach((line) => {
+    if (line.startsWith("## ")) { flush(); cat = line.slice(3).trim(); return; }
+    if (line.startsWith("---")) { flush(); cat = null; return; }
+    if (!cat) return;
+    if (line.startsWith("- ")) {
+      flush();
+      const t = line.slice(2);
+      const m = t.match(/^\*\*Q:\*\*\s*(.*)$/);
+      if (m) {
+        const q = m[1].replace(/\s*\(\d{2}:\d{2}\)\s*$/, "").replace(/\s*\{#[0-9a-f]+\}/, "").trim();
+        cur = { q, a: [] };
+      } else {
+        cur = { q: "", a: [t.replace(/^\(\d{2}:\d{2}\)\s*/, "")] }; // 自由記述など
+      }
+      return;
+    }
+    if (cur) cur.a.push(line.replace(/^ {2}- /, ""));
+  });
+  flush();
+  return out;
+}
+
+async function loadAllEntries(settings, onProgress) {
+  const files = await githubListFolder(settings, settings.path || DEFAULT_PATH);
+  const all = files.filter((f) => f.name.endsWith(".md")).sort((a, b) => (a.name < b.name ? 1 : -1));
+  const target = all.slice(0, CAT_LOAD_LIMIT);
+  const queue = target.slice();
+  const entries = [];
+  let done = 0;
+  async function worker() {
+    while (queue.length) {
+      const f = queue.shift();
+      try {
+        const { content } = await githubGetFile(settings, f.path);
+        if (content) entries.push(...parseDiary(content, f.name.replace(".md", "")));
+      } catch (e) { console.error(e); }
+      done++;
+      onProgress(done, target.length);
+    }
+  }
+  await Promise.all([worker(), worker(), worker(), worker()]);
+  return { all: entries, fileCount: target.length, total: all.length };
+}
+
+function groupByCat(all) {
+  const m = new Map();
+  all.forEach((e) => { if (!m.has(e.cat)) m.set(e.cat, []); m.get(e.cat).push(e); });
+  m.forEach((list) => list.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0)));
+  return m;
+}
+
+function orderedCats(cats) {
+  const known = [...CATEGORY_ORDER, ANALYSIS_CAT, "自由記述"];
+  return [...known.filter((c) => cats.includes(c)), ...cats.filter((c) => !known.includes(c))];
+}
+
+function ensureCatModal() {
+  let el = document.getElementById("cat-modal");
+  if (el) return el;
+  el = document.createElement("div");
+  el.id = "cat-modal";
+  el.className = "modal-overlay";
+  el.innerHTML = `<div class="modal-box"><div class="modal-header"><strong id="catModalTitle">カテゴリ別に見る</strong><button id="closeCatBtn" class="modal-close-btn">✕</button></div><div id="catBody"></div></div>`;
+  document.body.appendChild(el);
+  document.getElementById("closeCatBtn").addEventListener("click", () => el.classList.remove("open"));
+  return el;
+}
+
+function renderCatList() {
+  const body = document.getElementById("catBody");
+  document.getElementById("catModalTitle").textContent = "カテゴリ別に見る";
+  body.innerHTML = "";
+  const groups = groupByCat(catCache.all);
+
+  const note = document.createElement("div");
+  note.className = "hint";
+  note.textContent = `新しい順に${catCache.fileCount}日分を集計` + (catCache.total > catCache.fileCount ? `(全${catCache.total}日のうち)` : "");
+  body.appendChild(note);
+
+  const cats = orderedCats([...groups.keys()]);
+  if (cats.length === 0) body.appendChild(document.createTextNode("まだ日記がありません"));
+  cats.forEach((cat) => {
+    const btn = document.createElement("button");
+    btn.className = "browse-q-item";
+    btn.textContent = `${cat}(${groups.get(cat).length}件)`;
+    btn.addEventListener("click", () => renderCatEntries(cat, groups.get(cat)));
+    body.appendChild(btn);
+  });
+
+  const re = document.createElement("button");
+  re.className = "reroll";
+  re.style.marginTop = "10px";
+  re.textContent = "🔄 読み直す";
+  re.addEventListener("click", () => { catCache = null; openCatModal(); });
+  body.appendChild(re);
+}
+
+function renderCatEntries(cat, list) {
+  const body = document.getElementById("catBody");
+  document.getElementById("catModalTitle").textContent = `${cat}(${list.length}件)`;
+  body.innerHTML = "";
+  const back = document.createElement("button");
+  back.className = "reroll";
+  back.textContent = "← カテゴリ一覧へ";
+  back.addEventListener("click", renderCatList);
+  body.appendChild(back);
+
+  list.forEach((e) => {
+    const card = document.createElement("div");
+    card.style.cssText = "border:1px solid var(--border); border-radius:10px; padding:10px; margin-top:10px; background:#fcfcfb;";
+    const d = document.createElement("div");
+    d.style.cssText = "font-size:0.75rem; color:var(--muted);";
+    d.textContent = e.date;
+    card.appendChild(d);
+    if (e.q) {
+      const q = document.createElement("div");
+      q.style.cssText = "font-size:0.85rem; font-weight:600; margin-top:4px;";
+      q.textContent = e.q;
+      card.appendChild(q);
+    }
+    const a = document.createElement("div");
+    a.style.cssText = "font-size:0.92rem; margin-top:4px; white-space:pre-wrap;";
+    a.textContent = e.a;
+    card.appendChild(a);
+    body.appendChild(card);
+  });
+}
+
+async function openCatModal() {
+  const settings = loadSettings();
+  if (!settings || !settings.pat) {
+    setStatus("先に設定(⚙️)を入力してください");
+    openSettings();
+    return;
+  }
+  ensureCatModal().classList.add("open");
+  const body = document.getElementById("catBody");
+  if (!catCache) {
+    body.textContent = "読み込み中...";
+    try {
+      catCache = await loadAllEntries(settings, (d, t) => { body.textContent = `読み込み中... ${d}/${t}`; });
+    } catch (e) {
+      body.textContent = "エラー: " + e.message;
+      return;
+    }
+  }
+  renderCatList();
+}
+
 // ---------- 初期化 ----------
 
 document.getElementById("gearBtn").addEventListener("click", openSettings);
@@ -618,6 +783,18 @@ document.getElementById("closeBrowseBtn").addEventListener("click", closeBrowseM
 document.getElementById("viewPastBtn").addEventListener("click", openViewModal);
 document.getElementById("closeViewBtn").addEventListener("click", closeViewModal);
 document.getElementById("saveBtn").addEventListener("click", handleSave);
+
+{
+  const viewBtn = document.getElementById("viewPastBtn");
+  if (viewBtn && viewBtn.parentNode) {
+    const catBtn = document.createElement("button");
+    catBtn.id = "viewCatBtn";
+    catBtn.className = "add-question-btn";
+    catBtn.textContent = "🗂 カテゴリ別に見る";
+    catBtn.addEventListener("click", openCatModal);
+    viewBtn.parentNode.insertBefore(catBtn, viewBtn);
+  }
+}
 
 initDefaultCards();
 if (!loadSettings()) {

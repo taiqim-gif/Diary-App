@@ -1,5 +1,6 @@
 // 規格外さん日記 - アプリ本体(循環対応版)
 // 変更点: ①frontmatter(date/sleep/condition/links/tags) ②分析シート由来の質問 ③保存先の既定を diary に
+// 追加: ④分析シートからのジャンプ受け取り(?kw=キーワード,... &cell=項目ID先頭8桁)
 const SETTINGS_KEY = "shinkaronDiarySettings";
 const DEFAULT_PATH = "diary";
 // 分析シート由来の質問プール(同じリポジトリ内)。形式: [{ "cell": "41d736e1", "q": "質問文" }]
@@ -18,6 +19,7 @@ let questionCards = []; // { id, question: {cat, text, cell?}, answer }
 let analysisQuestions = []; // { cat: ANALYSIS_CAT, text, cell }
 let selectedFreeTags = [];
 let cardSeq = 0;
+let pendingJump = null; // 分析シートから渡された { kw: [], cell: "" }
 
 // ---------- ユーティリティ ----------
 
@@ -101,6 +103,12 @@ function closeSettings() {
   document.getElementById("settings-panel").classList.remove("open");
   document.getElementById("main-panel").classList.remove("hidden");
   loadAnalysisQuestions(); // 設定変更後に質問プールを再取得
+  // 設定が無くて保留されていた分析シートからのジャンプを実行
+  if (pendingJump && s.pat) {
+    const j = pendingJump;
+    pendingJump = null;
+    openJumpModal(j);
+  }
 }
 
 // ---------- 質問カードUI ----------
@@ -611,7 +619,7 @@ function closeViewModal() {
 
 // ---------- カテゴリ別に見る ----------
 
-let catCache = null; // { all: [{cat,date,q,a}], fileCount, total }
+let catCache = null; // { all: [{cat,date,q,a,cell}], fileCount, total }
 const CAT_LOAD_LIMIT = 90; // 新しい順にこの日数分まで読む
 
 // 日記ファイルを「見出し(カテゴリ)ごとの回答」に分解する
@@ -621,7 +629,7 @@ function parseDiary(content, dateStr) {
   let cat = null;
   let cur = null;
   const flush = () => {
-    if (cur && cat) out.push({ cat, date: dateStr, q: cur.q, a: cur.a.join("\n").trim() });
+    if (cur && cat) out.push({ cat, date: dateStr, q: cur.q, a: cur.a.join("\n").trim(), cell: cur.cell || "" });
     cur = null;
   };
   body.split("\n").forEach((line) => {
@@ -633,10 +641,11 @@ function parseDiary(content, dateStr) {
       const t = line.slice(2);
       const m = t.match(/^\*\*Q:\*\*\s*(.*)$/);
       if (m) {
+        const cm = m[1].match(/\{#([0-9a-f]+)\}/); // 分析シート由来の質問の項目ID
         const q = m[1].replace(/\s*\(\d{2}:\d{2}\)\s*$/, "").replace(/\s*\{#[0-9a-f]+\}/, "").trim();
-        cur = { q, a: [] };
+        cur = { q, a: [], cell: cm ? cm[1] : "" };
       } else {
-        cur = { q: "", a: [t.replace(/^\(\d{2}:\d{2}\)\s*/, "")] }; // 自由記述など
+        cur = { q: "", a: [t.replace(/^\(\d{2}:\d{2}\)\s*/, "")], cell: "" }; // 自由記述など
       }
       return;
     }
@@ -773,6 +782,121 @@ async function openCatModal() {
   renderCatList();
 }
 
+// ---------- 分析シートからのジャンプ(キーワード / 項目ID) ----------
+
+// URL の ?kw=睡眠,スマホ&cell=aaaaaaaa を読む。無ければ null
+function readJumpParams() {
+  const p = new URLSearchParams(location.search);
+  const kw = (p.get("kw") || "").split(",").map((s) => s.trim()).filter(Boolean);
+  const cell = (p.get("cell") || "").trim();
+  if (!kw.length && !cell) return null;
+  return { kw, cell };
+}
+
+// キーワードに印(<mark>)を付けて表示する(textContentベースで安全)
+function appendHighlighted(el, text, kws) {
+  if (!kws.length) { el.textContent = text; return; }
+  const lower = text.toLowerCase();
+  const ranges = [];
+  kws.forEach((k) => {
+    const kl = k.toLowerCase();
+    if (!kl) return;
+    let i = 0;
+    while ((i = lower.indexOf(kl, i)) !== -1) {
+      ranges.push([i, i + kl.length]);
+      i += kl.length;
+    }
+  });
+  ranges.sort((a, b) => a[0] - b[0]);
+  let pos = 0;
+  ranges.forEach(([s, e]) => {
+    if (e <= pos) return;
+    const start = Math.max(s, pos);
+    if (start > pos) el.appendChild(document.createTextNode(text.slice(pos, start)));
+    const mk = document.createElement("mark");
+    mk.textContent = text.slice(start, e);
+    el.appendChild(mk);
+    pos = e;
+  });
+  if (pos < text.length) el.appendChild(document.createTextNode(text.slice(pos)));
+}
+
+function renderJumpResults(j) {
+  const body = document.getElementById("catBody");
+  document.getElementById("catModalTitle").textContent = "関連：" + (j.kw.length ? j.kw.join("、") : "リンクされた質問");
+  body.innerHTML = "";
+
+  const kwl = j.kw.map((k) => k.toLowerCase());
+  const hits = catCache.all
+    .map((e) => {
+      const linked = !!(j.cell && e.cell === j.cell);
+      const text = (e.q + "\n" + e.a).toLowerCase();
+      const kwHit = kwl.some((k) => text.includes(k));
+      return { e, linked, kwHit };
+    })
+    .filter((x) => x.linked || x.kwHit)
+    .sort((a, b) => (a.e.date < b.e.date ? 1 : a.e.date > b.e.date ? -1 : 0));
+
+  const note = document.createElement("div");
+  note.className = "hint";
+  note.textContent =
+    `${hits.length}件(新しい順に${catCache.fileCount}日分から検索)` +
+    (catCache.total > catCache.fileCount ? `/全${catCache.total}日のうち` : "");
+  body.appendChild(note);
+
+  if (hits.length === 0) body.appendChild(document.createTextNode("該当する日記・質問はまだありません"));
+
+  hits.forEach(({ e, linked }) => {
+    const card = document.createElement("div");
+    card.style.cssText = "border:1px solid var(--border); border-radius:10px; padding:10px; margin-top:10px; background:#fcfcfb;";
+    const d = document.createElement("div");
+    d.style.cssText = "font-size:0.75rem; color:var(--muted);";
+    d.textContent = `${e.date}　${e.cat}` + (linked ? "　🔗 この項目の質問" : "");
+    card.appendChild(d);
+    if (e.q) {
+      const q = document.createElement("div");
+      q.style.cssText = "font-size:0.85rem; font-weight:600; margin-top:4px;";
+      appendHighlighted(q, e.q, j.kw);
+      card.appendChild(q);
+    }
+    const a = document.createElement("div");
+    a.style.cssText = "font-size:0.92rem; margin-top:4px; white-space:pre-wrap;";
+    appendHighlighted(a, e.a, j.kw);
+    card.appendChild(a);
+    body.appendChild(card);
+  });
+
+  const all = document.createElement("button");
+  all.className = "reroll";
+  all.style.marginTop = "10px";
+  all.textContent = "🗂 カテゴリ別に見る";
+  all.addEventListener("click", renderCatList);
+  body.appendChild(all);
+}
+
+async function openJumpModal(j) {
+  const settings = loadSettings();
+  if (!settings || !settings.pat) {
+    pendingJump = j; // 設定後に実行する
+    setStatus("先に設定(⚙️)を入力してください");
+    openSettings();
+    return;
+  }
+  ensureCatModal().classList.add("open");
+  const body = document.getElementById("catBody");
+  document.getElementById("catModalTitle").textContent = "関連：" + (j.kw.length ? j.kw.join("、") : "リンクされた質問");
+  if (!catCache) {
+    body.textContent = "読み込み中...";
+    try {
+      catCache = await loadAllEntries(settings, (d, t) => { body.textContent = `読み込み中... ${d}/${t}`; });
+    } catch (e) {
+      body.textContent = "エラー: " + e.message;
+      return;
+    }
+  }
+  renderJumpResults(j);
+}
+
 // ---------- 初期化 ----------
 
 document.getElementById("gearBtn").addEventListener("click", openSettings);
@@ -796,9 +920,17 @@ document.getElementById("saveBtn").addEventListener("click", handleSave);
   }
 }
 
+pendingJump = readJumpParams();
+if (pendingJump) window.history.replaceState(null, "", location.pathname); // 再読み込みで再実行しない
+
 initDefaultCards();
 if (!loadSettings()) {
-  openSettings();
+  openSettings(); // 設定後に closeSettings から pendingJump を実行
 } else {
   loadAnalysisQuestions();
+  if (pendingJump) {
+    const j = pendingJump;
+    pendingJump = null;
+    openJumpModal(j);
+  }
 }

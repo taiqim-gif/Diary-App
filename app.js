@@ -1,11 +1,5 @@
-// 規格外さん日記 - アプリ本体(循環対応版)
-// 変更点: ①frontmatter(date/sleep/condition/links/tags) ②分析シート由来の質問 ③保存先の既定を diary に
-// 追加: ④分析シートからのジャンプ受け取り(?kw=キーワード,... &cell=項目ID先頭8桁)
+// 規格外さん日記 - アプリ本体
 const SETTINGS_KEY = "shinkaronDiarySettings";
-const DEFAULT_PATH = "diary";
-// 分析シート由来の質問プール(同じリポジトリ内)。形式: [{ "cell": "41d736e1", "q": "質問文" }]
-const ANALYSIS_QUESTIONS_PATH = "analysis/questions.json";
-const ANALYSIS_CAT = "6. 分析シート由来";
 
 const CATEGORY_ORDER = [
   "1. 基本の振り返り",
@@ -15,11 +9,9 @@ const CATEGORY_ORDER = [
   "5. コミットメント",
 ];
 
-let questionCards = []; // { id, question: {cat, text, cell?}, answer }
-let analysisQuestions = []; // { cat: ANALYSIS_CAT, text, cell }
+let questionCards = []; // { id, question: {cat, text}, answer }
 let selectedFreeTags = [];
 let cardSeq = 0;
-let pendingJump = null; // 分析シートから渡された { kw: [], cell: "" }
 
 // ---------- ユーティリティ ----------
 
@@ -53,19 +45,12 @@ function setStatus(msg) {
   document.getElementById("status").textContent = msg;
 }
 
-// 質問プール: 分析シート由来が空なら通常プールを使う
-function poolFor(cat) {
-  if (cat === ANALYSIS_CAT) return analysisQuestions;
-  return QUESTIONS.filter((q) => q.cat === cat);
-}
-
-function allCategories() {
-  return analysisQuestions.length > 0 ? [...CATEGORY_ORDER, ANALYSIS_CAT] : CATEGORY_ORDER;
+function randomQuestion() {
+  return QUESTIONS[Math.floor(Math.random() * QUESTIONS.length)];
 }
 
 function randomQuestionInCategory(cat) {
-  const list = poolFor(cat);
-  if (list.length === 0) return QUESTIONS[Math.floor(Math.random() * QUESTIONS.length)];
+  const list = QUESTIONS.filter((q) => q.cat === cat);
   return list[Math.floor(Math.random() * list.length)];
 }
 
@@ -86,29 +71,26 @@ function openSettings() {
   document.getElementById("ownerInput").value = s.owner || "";
   document.getElementById("repoInput").value = s.repo || "";
   document.getElementById("branchInput").value = s.branch || "main";
-  document.getElementById("pathInput").value = s.path || DEFAULT_PATH;
+  document.getElementById("pathInput").value = diaryFilePath(s);
   document.getElementById("settings-panel").classList.add("open");
   document.getElementById("main-panel").classList.add("hidden");
 }
 
-function closeSettings() {
-  const s = {
+function settingsFromForm() {
+  return {
     pat: document.getElementById("patInput").value.trim(),
     owner: document.getElementById("ownerInput").value.trim(),
     repo: document.getElementById("repoInput").value.trim(),
     branch: document.getElementById("branchInput").value.trim() || "main",
-    path: document.getElementById("pathInput").value.trim() || DEFAULT_PATH,
+    path: document.getElementById("pathInput").value.trim() || "01_Daily/日記.md",
   };
+}
+
+function closeSettings() {
+  const s = settingsFromForm();
   saveSettingsToStorage(s);
   document.getElementById("settings-panel").classList.remove("open");
   document.getElementById("main-panel").classList.remove("hidden");
-  loadAnalysisQuestions(); // 設定変更後に質問プールを再取得
-  // 設定が無くて保留されていた分析シートからのジャンプを実行
-  if (pendingJump && s.pat) {
-    const j = pendingJump;
-    pendingJump = null;
-    openJumpModal(j);
-  }
 }
 
 // ---------- 質問カードUI ----------
@@ -122,8 +104,7 @@ function addQuestionCard(cat) {
 
 function initDefaultCards() {
   questionCards = [];
-  const cats = allCategories();
-  const cat = cats[Math.floor(Math.random() * cats.length)];
+  const cat = CATEGORY_ORDER[Math.floor(Math.random() * CATEGORY_ORDER.length)];
   const id = ++cardSeq;
   questionCards.push({ id, question: randomQuestionInCategory(cat), answer: "" });
   renderQuestionCards();
@@ -167,7 +148,7 @@ function renderQuestionCards() {
       const id = Number(el.dataset.cardId);
       const card = questionCards.find((c) => c.id === id);
       if (card) {
-        const others = allCategories().filter((c2) => c2 !== card.question.cat);
+        const others = CATEGORY_ORDER.filter((c2) => c2 !== card.question.cat);
         const newCat = others[Math.floor(Math.random() * others.length)];
         card.question = randomQuestionInCategory(newCat);
         card.answer = "";
@@ -211,59 +192,76 @@ function getAnswerFor(cardId) {
   return card && card.answer ? card.answer.trim() : "";
 }
 
-// ---------- frontmatter ----------
-
-// 先頭の --- ... --- を切り出す。無ければ fm は空配列(既存の旧形式の日記)
-function splitFrontmatter(content) {
-  if (content.startsWith("---\n")) {
-    const end = content.indexOf("\n---\n", 4);
-    if (end !== -1) {
-      return {
-        fm: content.slice(4, end).split("\n"),
-        body: content.slice(end + 5).replace(/^\n+/, ""),
-      };
-    }
-  }
-  return { fm: [], body: content };
-}
-
-function joinFrontmatter(fm, body) {
-  return `---\n${fm.join("\n")}\n---\n\n${body}`;
-}
-
-function setFmField(fm, key, value) {
-  const i = fm.findIndex((l) => l.startsWith(key + ":"));
-  const line = `${key}: ${value}`;
-  if (i !== -1) fm[i] = line;
-  else fm.push(line);
-}
-
-function ensureFmField(fm, key, value) {
-  if (!fm.some((l) => l.startsWith(key + ":"))) fm.push(`${key}: ${value}`);
-}
-
-// links: [a, b] に新しいIDを重複なく追加
-function mergeLinks(fm, newIds) {
-  const i = fm.findIndex((l) => l.startsWith("links:"));
-  let ids = [];
-  if (i !== -1) {
-    const m = fm[i].match(/\[(.*)\]/);
-    if (m) ids = m[1].split(",").map((s) => s.trim()).filter(Boolean);
-  }
-  newIds.forEach((id) => {
-    if (id && !ids.includes(id)) ids.push(id);
-  });
-  const line = `links: [${ids.join(", ")}]`;
-  if (i !== -1) fm[i] = line;
-  else fm.push(line);
-}
-
 // ---------- 本文組み立て ----------
 
 function buildSkeleton(dateStr) {
   const year = dateStr.slice(0, 4);
-  // 本文のみ(frontmatterは保存時に付与)。回答があったカテゴリのセクションだけ動的に追加される。
+  // 未回答の質問や空のセクション見出しは含めない。
+  // 回答があったカテゴリのセクションだけ、保存時に insertIntoSection が動的に追加する。
   return `# ${dateStr} の日記\n\n---\nタグ: #日記 #${year} #自己分析\n`;
+}
+
+// ---------- 1ファイル運用:日付ブロックの操作 ----------
+
+// 設定のpathは「ファイルのパス」。旧設定(フォルダ名のみ)の場合は 日記.md を補う
+function diaryFilePath(settings) {
+  const p = ((settings && settings.path) || "01_Daily").trim();
+  return p.endsWith(".md") ? p : `${p.replace(/\/+$/, "")}/日記.md`;
+}
+
+// 「# YYYY-MM-DD の日記」から次の「# 」見出し(=次の日)の手前までを1日分とする
+function getDayBlock(lines, dateStr) {
+  const heading = `# ${dateStr} の日記`;
+  const start = lines.findIndex((l) => l.trim() === heading);
+  if (start === -1) return null;
+  let end = lines.length;
+  for (let i = start + 1; i < lines.length; i++) {
+    if (lines[i].startsWith("# ")) {
+      end = i;
+      break;
+    }
+  }
+  return { start, end };
+}
+
+// 指定日のブロックだけを transformFn で書き換えて、ファイル全体を返す。
+// その日のブロックが無ければ新規作成し、ファイルの先頭(新しい日が上)に置く。
+function updateDayBlock(fullContent, dateStr, transformFn) {
+  const lines =
+    fullContent.trim() === "" ? [] : fullContent.replace(/\n+$/, "").split("\n");
+  const block = getDayBlock(lines, dateStr);
+
+  if (!block) {
+    const newBlock = transformFn(buildSkeleton(dateStr)).replace(/\n+$/, "");
+    const out = [newBlock];
+    if (lines.length) out.push("", ...lines);
+    return out.join("\n") + "\n";
+  }
+
+  const dayContent = lines.slice(block.start, block.end).join("\n");
+  const newDay = transformFn(dayContent).replace(/\n+$/, "");
+  const before = lines.slice(0, block.start);
+  const after = lines.slice(block.end);
+  const out = [...before, ...newDay.split("\n")];
+  if (after.length) out.push("", ...after);
+  return out.join("\n") + "\n";
+}
+
+// ファイル内の日付一覧(新しい順)
+function listDiaryDates(content) {
+  const dates = [];
+  content.split("\n").forEach((l) => {
+    const m = l.match(/^# (\d{4}-\d{2}-\d{2}) の日記/);
+    if (m) dates.push(m[1]);
+  });
+  return dates.sort().reverse();
+}
+
+function extractDayText(content, dateStr) {
+  const lines = content.split("\n");
+  const block = getDayBlock(lines, dateStr);
+  if (!block) return "";
+  return lines.slice(block.start, block.end).join("\n").trim();
 }
 
 function insertConditionLine(content, conditionText) {
@@ -279,6 +277,24 @@ function insertConditionLine(content, conditionText) {
   return lines.join("\n");
 }
 
+// セクション末尾(最後の中身の行の直後)に block を挿入する。余計な空行は増やさない
+function insertAtSectionEnd(lines, startIdx, block) {
+  let endIdx = lines.length;
+  for (let i = startIdx + 1; i < lines.length; i++) {
+    if (lines[i].startsWith("## ") || lines[i].startsWith("---")) {
+      endIdx = i;
+      break;
+    }
+  }
+  let last = endIdx - 1;
+  while (last > startIdx && lines[last].trim() === "") last--;
+  const before = lines.slice(0, last + 1);
+  const after = lines.slice(endIdx);
+  before.push(block);
+  if (after.length) before.push("");
+  return [...before, ...after].join("\n");
+}
+
 function insertIntoSection(content, categoryHeading, block) {
   const lines = content.split("\n");
   const headingLine = "## " + categoryHeading;
@@ -288,18 +304,7 @@ function insertIntoSection(content, categoryHeading, block) {
     return appendSectionBeforeTags(content, categoryHeading, block);
   }
 
-  let endIdx = lines.length;
-  for (let i = startIdx + 1; i < lines.length; i++) {
-    if (lines[i].startsWith("## ") || lines[i].startsWith("---")) {
-      endIdx = i;
-      break;
-    }
-  }
-  const before = lines.slice(0, endIdx);
-  const after = lines.slice(endIdx);
-  if (before[before.length - 1].trim() !== "") before.push("");
-  before.push(block, "");
-  return [...before, ...after].join("\n");
+  return insertAtSectionEnd(lines, startIdx, block);
 }
 
 function appendSectionBeforeTags(content, heading, block) {
@@ -323,18 +328,7 @@ function appendFreeText(content, freeText, tags) {
   if (startIdx === -1) {
     return appendSectionBeforeTags(content, "自由記述", block);
   }
-  let endIdx = lines.length;
-  for (let i = startIdx + 1; i < lines.length; i++) {
-    if (lines[i].startsWith("## ") || lines[i].startsWith("---")) {
-      endIdx = i;
-      break;
-    }
-  }
-  const before = lines.slice(0, endIdx);
-  const after = lines.slice(endIdx);
-  if (before[before.length - 1].trim() !== "") before.push("");
-  before.push(block, "");
-  return [...before, ...after].join("\n");
+  return insertAtSectionEnd(lines, startIdx, block);
 }
 
 // ---------- GitHub API ----------
@@ -376,25 +370,6 @@ async function githubPutFile(settings, filePath, content, sha, message) {
   }
 }
 
-// ---------- 分析シート由来の質問 ----------
-
-async function loadAnalysisQuestions() {
-  const settings = loadSettings();
-  if (!settings || !settings.pat || !settings.owner || !settings.repo) return;
-  try {
-    const { content } = await githubGetFile(settings, ANALYSIS_QUESTIONS_PATH);
-    if (content === null) return; // まだ無ければ通常の質問だけで動く
-    const list = JSON.parse(content);
-    analysisQuestions = list
-      .filter((x) => x && x.q && x.cell)
-      .map((x) => ({ cat: ANALYSIS_CAT, text: x.q, cell: String(x.cell) }));
-    // まだ何も入力していなければ、分析由来の質問も混ぜて引き直す
-    if (questionCards.every((c) => !c.answer)) initDefaultCards();
-  } catch (e) {
-    console.error("分析質問の読み込み失敗:", e); // 失敗しても日記入力は止めない
-  }
-}
-
 // ---------- 保存処理 ----------
 
 async function handleSave() {
@@ -411,69 +386,59 @@ async function handleSave() {
 
   try {
     const dateStr = todayStr();
-    const dir = settings.path || DEFAULT_PATH;
-    const filePath = `${dir}/${dateStr}.md`;
+    const filePath = diaryFilePath(settings);
 
-    const { content, sha } = await githubGetFile(settings, filePath);
-    const raw = content !== null ? content : buildSkeleton(dateStr);
-    let { fm, body } = splitFrontmatter(raw);
-    let newContent = body;
+    // その日のブロックに対して行う変更を集める
+    const transforms = [];
 
     const condition = document.getElementById("conditionSelect").value;
     const sleep = document.getElementById("sleepInput").value;
-    let hasAnyInput = false;
 
     if (condition || sleep) {
       const parts = [];
       if (condition) parts.push(`体調: ${condition}`);
       if (sleep) parts.push(`睡眠時間: ${sleep}時間`);
       parts.push(`(${timeStr()})`);
-      newContent = insertConditionLine(newContent, parts.join("　"));
-      if (condition) setFmField(fm, "condition", condition);
-      if (sleep) setFmField(fm, "sleep", sleep);
-      hasAnyInput = true;
+      const condLine = parts.join("　");
+      transforms.push((b) => insertConditionLine(b, condLine));
     }
 
-    const newLinks = [];
     for (const c of questionCards) {
       const answer = getAnswerFor(c.id);
       if (answer) {
-        const idMark = c.question.cell ? ` {#${c.question.cell}}` : "";
-        const block = `- **Q:** ${c.question.text}${idMark} (${timeStr()})\n  - ${answer}`;
-        newContent = insertIntoSection(newContent, c.question.cat, block);
-        if (c.question.cell) newLinks.push(c.question.cell);
-        hasAnyInput = true;
+        const qBlock = `- **Q:** ${c.question.text} (${timeStr()})\n  - ${answer}`;
+        const cat = c.question.cat;
+        transforms.push((b) => insertIntoSection(b, cat, qBlock));
       }
     }
 
     const freeText = document.getElementById("freeText").value.trim();
     if (freeText) {
-      newContent = appendFreeText(newContent, freeText, selectedFreeTags);
-      hasAnyInput = true;
+      const tags = selectedFreeTags.slice();
+      transforms.push((b) => appendFreeText(b, freeText, tags));
     }
 
-    if (!hasAnyInput) {
+    if (transforms.length === 0) {
       setStatus("入力がありません");
       saveBtn.disabled = false;
       return;
     }
 
-    // frontmatter の仕上げ(旧形式の日記にも付与される)
-    if (!fm.some((l) => l.startsWith("date:"))) fm.unshift(`date: ${dateStr}`); // dateを先頭に
-    mergeLinks(fm, newLinks);
-    ensureFmField(fm, "tags", "[]"); // 週次でClaudeが付ける
-    const finalContent = joinFrontmatter(fm, newContent);
+    // 保存直前にGitHubの最新を取得してから、今日のブロックだけを書き換える
+    const { content, sha } = await githubGetFile(settings, filePath);
+    const newContent = updateDayBlock(content || "", dateStr, (block) =>
+      transforms.reduce((acc, fn) => fn(acc), block)
+    );
 
     await githubPutFile(
       settings,
       filePath,
-      finalContent,
+      newContent,
       sha,
       `diary: ${dateStr} app update`
     );
 
     setStatus("保存しました ✓");
-    catCache = null; // カテゴリ別一覧は次回開くときに読み直す
     document.getElementById("freeText").value = "";
     selectedFreeTags = [];
     document.getElementById("tagPicker").classList.remove("open");
@@ -523,13 +488,13 @@ function toggleTagPicker() {
 function openBrowseModal() {
   const listEl = document.getElementById("browseList");
   listEl.innerHTML = "";
-  allCategories().forEach((cat) => {
+  CATEGORY_ORDER.forEach((cat) => {
     const title = document.createElement("div");
     title.className = "browse-cat-title";
     title.textContent = cat;
     listEl.appendChild(title);
 
-    poolFor(cat).forEach((q) => {
+    QUESTIONS.filter((q) => q.cat === cat).forEach((q) => {
       const btn = document.createElement("button");
       btn.className = "browse-q-item";
       btn.textContent = q.text;
@@ -551,6 +516,8 @@ function closeBrowseModal() {
 
 // ---------- 過去の日記を見る ----------
 
+// ---------- 日付別ファイル → 日記.md への統合 ----------
+
 async function githubListFolder(settings, folderPath) {
   const url = `https://api.github.com/repos/${settings.owner}/${settings.repo}/contents/${folderPath}?ref=${settings.branch}`;
   const res = await fetch(url, {
@@ -563,6 +530,118 @@ async function githubListFolder(settings, folderPath) {
   return res.json();
 }
 
+// 日記ファイルを「日付ブロックの配列」に分解する
+function parseDayBlocks(content) {
+  const lines =
+    content.trim() === "" ? [] : content.replace(/\r\n/g, "\n").replace(/\n+$/, "").split("\n");
+  const preamble = [];
+  const blocks = [];
+  let cur = null;
+  for (const l of lines) {
+    const m = l.match(/^# (\d{4}-\d{2}-\d{2}) の日記/);
+    if (m) {
+      cur = { date: m[1], lines: [l] };
+      blocks.push(cur);
+    } else if (cur) {
+      cur.lines.push(l);
+    } else {
+      preamble.push(l);
+    }
+  }
+  return { preamble, blocks };
+}
+
+// 新しい日が上になるよう並べ直して1つの文字列にする
+function buildDiaryFile(preamble, blocks) {
+  const parts = [];
+  if (preamble.join("").trim()) parts.push(preamble.join("\n").replace(/\n+$/, ""));
+  blocks
+    .slice()
+    .sort((a, b) => (a.date < b.date ? 1 : -1))
+    .forEach((b) => parts.push(b.lines.join("\n").replace(/\n+$/, "")));
+  return parts.join("\n\n") + "\n";
+}
+
+// 日付別ファイルの中身を、1ファイル運用の1日ブロックとして使える形に整える
+function normalizeImportedDay(date, raw) {
+  const lines = raw.replace(/\r\n/g, "\n").replace(/\n+$/, "").split("\n");
+  const heading = `# ${date} の日記`;
+  if (lines[0] && lines[0].trim() === heading) {
+    // そのまま
+  } else if (lines[0] && lines[0].startsWith("# ")) {
+    lines[0] = heading;
+  } else {
+    lines.unshift(heading, "");
+  }
+  // 2行目以降の「# 」は日の区切りと誤認されないよう「## 」に下げる
+  for (let i = 1; i < lines.length; i++) {
+    if (lines[i].startsWith("# ")) lines[i] = "#" + lines[i];
+  }
+  return lines.join("\n");
+}
+
+async function migrateDailyFiles() {
+  const out = document.getElementById("migrateStatus");
+  const s = settingsFromForm();
+  if (!s.pat || !s.owner || !s.repo) {
+    out.textContent = "先にトークン・オーナー・リポジトリ名を入力してください";
+    return;
+  }
+  if (!window.confirm("日付ごとのファイルを日記.mdに統合します。元のファイルは削除しません。よろしいですか?")) {
+    return;
+  }
+  out.textContent = "確認中...";
+  try {
+    const filePath = diaryFilePath(s);
+    const folder = filePath.includes("/") ? filePath.slice(0, filePath.lastIndexOf("/")) : "";
+    const list = await githubListFolder(s, folder);
+    const dayFiles = list
+      .filter((f) => f.type === "file" && /^\d{4}-\d{2}-\d{2}\.md$/.test(f.name))
+      .sort((a, b) => (a.name < b.name ? -1 : 1));
+    if (dayFiles.length === 0) {
+      out.textContent = "統合する日付別ファイルはありません";
+      return;
+    }
+
+    const { content: existing, sha } = await githubGetFile(s, filePath);
+    const parsed = parseDayBlocks(existing || "");
+    const have = new Set(parsed.blocks.map((b) => b.date));
+    let added = 0;
+    let skipped = 0;
+    for (const f of dayFiles) {
+      const date = f.name.slice(0, 10);
+      if (have.has(date)) {
+        skipped++;
+        continue;
+      }
+      const { content } = await githubGetFile(s, f.path);
+      if (content === null || content.trim() === "") {
+        skipped++;
+        continue;
+      }
+      parsed.blocks.push({ date, lines: normalizeImportedDay(date, content).split("\n") });
+      have.add(date);
+      added++;
+    }
+    if (added === 0) {
+      out.textContent = `追加する日記はありませんでした(統合済み・空ファイル: ${skipped}件)`;
+      return;
+    }
+    await githubPutFile(
+      s,
+      filePath,
+      buildDiaryFile(parsed.preamble, parsed.blocks),
+      sha,
+      `diary: merge ${added} daily files`
+    );
+    out.textContent = `${added}日分を ${filePath} に統合しました。元の日付別ファイルは残してあります(確認後にPCで削除してください)`;
+  } catch (e) {
+    out.textContent = "エラー: " + e.message;
+  }
+}
+
+let viewCache = null; // { content }
+
 async function openViewModal() {
   const settings = loadSettings();
   if (!settings || !settings.pat) {
@@ -571,330 +650,117 @@ async function openViewModal() {
     return;
   }
   document.getElementById("viewModalTitle").textContent = "過去の日記";
-  document.getElementById("viewContent").style.display = "none";
+  document.getElementById("viewStatus").textContent = "";
+  setViewMode("list");
   const listEl = document.getElementById("viewDateList");
   listEl.innerHTML = "読み込み中...";
   document.getElementById("view-modal").classList.add("open");
 
   try {
-    const files = await githubListFolder(settings, settings.path || DEFAULT_PATH);
-    const mdFiles = files
-      .filter((f) => f.name.endsWith(".md"))
-      .sort((a, b) => (a.name < b.name ? 1 : -1));
-
+    const { content } = await githubGetFile(settings, diaryFilePath(settings));
+    if (content === null) {
+      listEl.textContent = "まだ日記がありません";
+      return;
+    }
+    viewCache = { content };
+    const dates = listDiaryDates(content);
     listEl.innerHTML = "";
-    mdFiles.forEach((f) => {
+    if (dates.length === 0) {
+      listEl.textContent = "まだ日記がありません";
+      return;
+    }
+    dates.forEach((d) => {
       const btn = document.createElement("button");
       btn.className = "browse-q-item";
-      btn.textContent = f.name.replace(".md", "");
-      btn.addEventListener("click", () => showEntry(settings, f.path, f.name));
+      btn.textContent = d;
+      btn.addEventListener("click", () => showEntry(d));
       listEl.appendChild(btn);
     });
-    if (mdFiles.length === 0) listEl.textContent = "まだ日記がありません";
   } catch (e) {
     listEl.textContent = "エラー: " + e.message;
   }
 }
 
-async function showEntry(settings, filePath, fileName) {
-  const listEl = document.getElementById("viewDateList");
-  const contentEl = document.getElementById("viewContent");
-  listEl.style.display = "none";
-  contentEl.style.display = "block";
-  contentEl.textContent = "読み込み中...";
-  document.getElementById("viewModalTitle").textContent = fileName.replace(".md", "");
+let currentViewDate = null;
+
+function setViewMode(mode) {
+  // mode: "list"(日付一覧) / "read"(閲覧) / "edit"(編集)
+  const $ = (id) => document.getElementById(id);
+  $("viewDateList").style.display = mode === "list" ? "block" : "none";
+  $("viewContent").style.display = mode === "read" ? "block" : "none";
+  $("viewEditArea").style.display = mode === "edit" ? "block" : "none";
+  $("viewActions").style.display = mode === "list" ? "none" : "flex";
+  $("editEntryBtn").style.display = mode === "read" ? "inline-block" : "none";
+  $("cancelEditBtn").style.display = mode === "edit" ? "inline-block" : "none";
+  $("saveEditBtn").style.display = mode === "edit" ? "inline-block" : "none";
+}
+
+function showEntry(dateStr) {
+  currentViewDate = dateStr;
+  document.getElementById("viewModalTitle").textContent = dateStr;
+  document.getElementById("viewStatus").textContent = "";
+  document.getElementById("viewContent").textContent = viewCache
+    ? extractDayText(viewCache.content, dateStr) || "(空)"
+    : "(読み込みに失敗しました)";
+  setViewMode("read");
+}
+
+// 編集開始:PC側で更新されている可能性があるので、必ず最新をGitHubから取り直す
+async function startEditEntry() {
+  const settings = loadSettings();
+  const statusEl = document.getElementById("viewStatus");
+  statusEl.textContent = "最新を取得中...";
   try {
-    const { content } = await githubGetFile(settings, filePath);
-    contentEl.textContent = content || "(空)";
+    const { content } = await githubGetFile(settings, diaryFilePath(settings));
+    viewCache = { content: content || "" };
+    document.getElementById("viewEditArea").value = extractDayText(viewCache.content, currentViewDate);
+    statusEl.textContent = "";
+    setViewMode("edit");
   } catch (e) {
-    contentEl.textContent = "エラー: " + e.message;
+    statusEl.textContent = "エラー: " + e.message;
+  }
+}
+
+function cancelEditEntry() {
+  document.getElementById("viewStatus").textContent = "";
+  setViewMode("read");
+}
+
+// 保存:その日のブロックだけを差し替える(他の日は触らない)
+async function saveEditEntry() {
+  const settings = loadSettings();
+  const statusEl = document.getElementById("viewStatus");
+  const saveBtn = document.getElementById("saveEditBtn");
+  const text = document.getElementById("viewEditArea").value;
+  if (!text.trim()) {
+    statusEl.textContent = "空にはできません";
+    return;
+  }
+  saveBtn.disabled = true;
+  statusEl.textContent = "保存中...";
+  try {
+    const filePath = diaryFilePath(settings);
+    const { content, sha } = await githubGetFile(settings, filePath);
+    const newContent = updateDayBlock(content || "", currentViewDate, () =>
+      normalizeImportedDay(currentViewDate, text)
+    );
+    await githubPutFile(settings, filePath, newContent, sha, `diary: ${currentViewDate} edit`);
+    viewCache = { content: newContent };
+    document.getElementById("viewContent").textContent =
+      extractDayText(newContent, currentViewDate) || "(空)";
+    setViewMode("read");
+    statusEl.textContent = "保存しました ✓";
+  } catch (e) {
+    statusEl.textContent = "エラー: " + e.message;
+  } finally {
+    saveBtn.disabled = false;
   }
 }
 
 function closeViewModal() {
   document.getElementById("view-modal").classList.remove("open");
-  document.getElementById("viewDateList").style.display = "block";
-  document.getElementById("viewContent").style.display = "none";
-}
-
-// ---------- カテゴリ別に見る ----------
-
-let catCache = null; // { all: [{cat,date,q,a,cell}], fileCount, total }
-const CAT_LOAD_LIMIT = 90; // 新しい順にこの日数分まで読む
-
-// 日記ファイルを「見出し(カテゴリ)ごとの回答」に分解する
-function parseDiary(content, dateStr) {
-  const { body } = splitFrontmatter(content);
-  const out = [];
-  let cat = null;
-  let cur = null;
-  const flush = () => {
-    if (cur && cat) out.push({ cat, date: dateStr, q: cur.q, a: cur.a.join("\n").trim(), cell: cur.cell || "" });
-    cur = null;
-  };
-  body.split("\n").forEach((line) => {
-    if (line.startsWith("## ")) { flush(); cat = line.slice(3).trim(); return; }
-    if (line.startsWith("---")) { flush(); cat = null; return; }
-    if (!cat) return;
-    if (line.startsWith("- ")) {
-      flush();
-      const t = line.slice(2);
-      const m = t.match(/^\*\*Q:\*\*\s*(.*)$/);
-      if (m) {
-        const cm = m[1].match(/\{#([0-9a-f]+)\}/); // 分析シート由来の質問の項目ID
-        const q = m[1].replace(/\s*\(\d{2}:\d{2}\)\s*$/, "").replace(/\s*\{#[0-9a-f]+\}/, "").trim();
-        cur = { q, a: [], cell: cm ? cm[1] : "" };
-      } else {
-        cur = { q: "", a: [t.replace(/^\(\d{2}:\d{2}\)\s*/, "")], cell: "" }; // 自由記述など
-      }
-      return;
-    }
-    if (cur) cur.a.push(line.replace(/^ {2}- /, ""));
-  });
-  flush();
-  return out;
-}
-
-async function loadAllEntries(settings, onProgress) {
-  const files = await githubListFolder(settings, settings.path || DEFAULT_PATH);
-  const all = files.filter((f) => f.name.endsWith(".md")).sort((a, b) => (a.name < b.name ? 1 : -1));
-  const target = all.slice(0, CAT_LOAD_LIMIT);
-  const queue = target.slice();
-  const entries = [];
-  let done = 0;
-  async function worker() {
-    while (queue.length) {
-      const f = queue.shift();
-      try {
-        const { content } = await githubGetFile(settings, f.path);
-        if (content) entries.push(...parseDiary(content, f.name.replace(".md", "")));
-      } catch (e) { console.error(e); }
-      done++;
-      onProgress(done, target.length);
-    }
-  }
-  await Promise.all([worker(), worker(), worker(), worker()]);
-  return { all: entries, fileCount: target.length, total: all.length };
-}
-
-function groupByCat(all) {
-  const m = new Map();
-  all.forEach((e) => { if (!m.has(e.cat)) m.set(e.cat, []); m.get(e.cat).push(e); });
-  m.forEach((list) => list.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0)));
-  return m;
-}
-
-function orderedCats(cats) {
-  const known = [...CATEGORY_ORDER, ANALYSIS_CAT, "自由記述"];
-  return [...known.filter((c) => cats.includes(c)), ...cats.filter((c) => !known.includes(c))];
-}
-
-function ensureCatModal() {
-  let el = document.getElementById("cat-modal");
-  if (el) return el;
-  el = document.createElement("div");
-  el.id = "cat-modal";
-  el.className = "modal-overlay";
-  el.innerHTML = `<div class="modal-box"><div class="modal-header"><strong id="catModalTitle">カテゴリ別に見る</strong><button id="closeCatBtn" class="modal-close-btn">✕</button></div><div id="catBody"></div></div>`;
-  document.body.appendChild(el);
-  document.getElementById("closeCatBtn").addEventListener("click", () => el.classList.remove("open"));
-  return el;
-}
-
-function renderCatList() {
-  const body = document.getElementById("catBody");
-  document.getElementById("catModalTitle").textContent = "カテゴリ別に見る";
-  body.innerHTML = "";
-  const groups = groupByCat(catCache.all);
-
-  const note = document.createElement("div");
-  note.className = "hint";
-  note.textContent = `新しい順に${catCache.fileCount}日分を集計` + (catCache.total > catCache.fileCount ? `(全${catCache.total}日のうち)` : "");
-  body.appendChild(note);
-
-  const cats = orderedCats([...groups.keys()]);
-  if (cats.length === 0) body.appendChild(document.createTextNode("まだ日記がありません"));
-  cats.forEach((cat) => {
-    const btn = document.createElement("button");
-    btn.className = "browse-q-item";
-    btn.textContent = `${cat}(${groups.get(cat).length}件)`;
-    btn.addEventListener("click", () => renderCatEntries(cat, groups.get(cat)));
-    body.appendChild(btn);
-  });
-
-  const re = document.createElement("button");
-  re.className = "reroll";
-  re.style.marginTop = "10px";
-  re.textContent = "🔄 読み直す";
-  re.addEventListener("click", () => { catCache = null; openCatModal(); });
-  body.appendChild(re);
-}
-
-function renderCatEntries(cat, list) {
-  const body = document.getElementById("catBody");
-  document.getElementById("catModalTitle").textContent = `${cat}(${list.length}件)`;
-  body.innerHTML = "";
-  const back = document.createElement("button");
-  back.className = "reroll";
-  back.textContent = "← カテゴリ一覧へ";
-  back.addEventListener("click", renderCatList);
-  body.appendChild(back);
-
-  list.forEach((e) => {
-    const card = document.createElement("div");
-    card.style.cssText = "border:1px solid var(--border); border-radius:10px; padding:10px; margin-top:10px; background:#fcfcfb;";
-    const d = document.createElement("div");
-    d.style.cssText = "font-size:0.75rem; color:var(--muted);";
-    d.textContent = e.date;
-    card.appendChild(d);
-    if (e.q) {
-      const q = document.createElement("div");
-      q.style.cssText = "font-size:0.85rem; font-weight:600; margin-top:4px;";
-      q.textContent = e.q;
-      card.appendChild(q);
-    }
-    const a = document.createElement("div");
-    a.style.cssText = "font-size:0.92rem; margin-top:4px; white-space:pre-wrap;";
-    a.textContent = e.a;
-    card.appendChild(a);
-    body.appendChild(card);
-  });
-}
-
-async function openCatModal() {
-  const settings = loadSettings();
-  if (!settings || !settings.pat) {
-    setStatus("先に設定(⚙️)を入力してください");
-    openSettings();
-    return;
-  }
-  ensureCatModal().classList.add("open");
-  const body = document.getElementById("catBody");
-  if (!catCache) {
-    body.textContent = "読み込み中...";
-    try {
-      catCache = await loadAllEntries(settings, (d, t) => { body.textContent = `読み込み中... ${d}/${t}`; });
-    } catch (e) {
-      body.textContent = "エラー: " + e.message;
-      return;
-    }
-  }
-  renderCatList();
-}
-
-// ---------- 分析シートからのジャンプ(キーワード / 項目ID) ----------
-
-// URL の ?kw=睡眠,スマホ&cell=aaaaaaaa を読む。無ければ null
-function readJumpParams() {
-  const p = new URLSearchParams(location.search);
-  const kw = (p.get("kw") || "").split(",").map((s) => s.trim()).filter(Boolean);
-  const cell = (p.get("cell") || "").trim();
-  if (!kw.length && !cell) return null;
-  return { kw, cell };
-}
-
-// キーワードに印(<mark>)を付けて表示する(textContentベースで安全)
-function appendHighlighted(el, text, kws) {
-  if (!kws.length) { el.textContent = text; return; }
-  const lower = text.toLowerCase();
-  const ranges = [];
-  kws.forEach((k) => {
-    const kl = k.toLowerCase();
-    if (!kl) return;
-    let i = 0;
-    while ((i = lower.indexOf(kl, i)) !== -1) {
-      ranges.push([i, i + kl.length]);
-      i += kl.length;
-    }
-  });
-  ranges.sort((a, b) => a[0] - b[0]);
-  let pos = 0;
-  ranges.forEach(([s, e]) => {
-    if (e <= pos) return;
-    const start = Math.max(s, pos);
-    if (start > pos) el.appendChild(document.createTextNode(text.slice(pos, start)));
-    const mk = document.createElement("mark");
-    mk.textContent = text.slice(start, e);
-    el.appendChild(mk);
-    pos = e;
-  });
-  if (pos < text.length) el.appendChild(document.createTextNode(text.slice(pos)));
-}
-
-function renderJumpResults(j) {
-  const body = document.getElementById("catBody");
-  document.getElementById("catModalTitle").textContent = "関連：" + (j.kw.length ? j.kw.join("、") : "リンクされた質問");
-  body.innerHTML = "";
-
-  const kwl = j.kw.map((k) => k.toLowerCase());
-  const hits = catCache.all
-    .map((e) => {
-      const linked = !!(j.cell && e.cell === j.cell);
-      const text = (e.q + "\n" + e.a).toLowerCase();
-      const kwHit = kwl.some((k) => text.includes(k));
-      return { e, linked, kwHit };
-    })
-    .filter((x) => x.linked || x.kwHit)
-    .sort((a, b) => (a.e.date < b.e.date ? 1 : a.e.date > b.e.date ? -1 : 0));
-
-  const note = document.createElement("div");
-  note.className = "hint";
-  note.textContent =
-    `${hits.length}件(新しい順に${catCache.fileCount}日分から検索)` +
-    (catCache.total > catCache.fileCount ? `/全${catCache.total}日のうち` : "");
-  body.appendChild(note);
-
-  if (hits.length === 0) body.appendChild(document.createTextNode("該当する日記・質問はまだありません"));
-
-  hits.forEach(({ e, linked }) => {
-    const card = document.createElement("div");
-    card.style.cssText = "border:1px solid var(--border); border-radius:10px; padding:10px; margin-top:10px; background:#fcfcfb;";
-    const d = document.createElement("div");
-    d.style.cssText = "font-size:0.75rem; color:var(--muted);";
-    d.textContent = `${e.date}　${e.cat}` + (linked ? "　🔗 この項目の質問" : "");
-    card.appendChild(d);
-    if (e.q) {
-      const q = document.createElement("div");
-      q.style.cssText = "font-size:0.85rem; font-weight:600; margin-top:4px;";
-      appendHighlighted(q, e.q, j.kw);
-      card.appendChild(q);
-    }
-    const a = document.createElement("div");
-    a.style.cssText = "font-size:0.92rem; margin-top:4px; white-space:pre-wrap;";
-    appendHighlighted(a, e.a, j.kw);
-    card.appendChild(a);
-    body.appendChild(card);
-  });
-
-  const all = document.createElement("button");
-  all.className = "reroll";
-  all.style.marginTop = "10px";
-  all.textContent = "🗂 カテゴリ別に見る";
-  all.addEventListener("click", renderCatList);
-  body.appendChild(all);
-}
-
-async function openJumpModal(j) {
-  const settings = loadSettings();
-  if (!settings || !settings.pat) {
-    pendingJump = j; // 設定後に実行する
-    setStatus("先に設定(⚙️)を入力してください");
-    openSettings();
-    return;
-  }
-  ensureCatModal().classList.add("open");
-  const body = document.getElementById("catBody");
-  document.getElementById("catModalTitle").textContent = "関連：" + (j.kw.length ? j.kw.join("、") : "リンクされた質問");
-  if (!catCache) {
-    body.textContent = "読み込み中...";
-    try {
-      catCache = await loadAllEntries(settings, (d, t) => { body.textContent = `読み込み中... ${d}/${t}`; });
-    } catch (e) {
-      body.textContent = "エラー: " + e.message;
-      return;
-    }
-  }
-  renderJumpResults(j);
+  document.getElementById("viewStatus").textContent = "";
+  setViewMode("list");
 }
 
 // ---------- 初期化 ----------
@@ -906,31 +772,13 @@ document.getElementById("tagToggleBtn").addEventListener("click", toggleTagPicke
 document.getElementById("closeBrowseBtn").addEventListener("click", closeBrowseModal);
 document.getElementById("viewPastBtn").addEventListener("click", openViewModal);
 document.getElementById("closeViewBtn").addEventListener("click", closeViewModal);
+document.getElementById("editEntryBtn").addEventListener("click", startEditEntry);
+document.getElementById("cancelEditBtn").addEventListener("click", cancelEditEntry);
+document.getElementById("saveEditBtn").addEventListener("click", saveEditEntry);
 document.getElementById("saveBtn").addEventListener("click", handleSave);
-
-{
-  const viewBtn = document.getElementById("viewPastBtn");
-  if (viewBtn && viewBtn.parentNode) {
-    const catBtn = document.createElement("button");
-    catBtn.id = "viewCatBtn";
-    catBtn.className = "add-question-btn";
-    catBtn.textContent = "🗂 カテゴリ別に見る";
-    catBtn.addEventListener("click", openCatModal);
-    viewBtn.parentNode.insertBefore(catBtn, viewBtn);
-  }
-}
-
-pendingJump = readJumpParams();
-if (pendingJump) window.history.replaceState(null, "", location.pathname); // 再読み込みで再実行しない
+document.getElementById("migrateBtn").addEventListener("click", migrateDailyFiles);
 
 initDefaultCards();
 if (!loadSettings()) {
-  openSettings(); // 設定後に closeSettings から pendingJump を実行
-} else {
-  loadAnalysisQuestions();
-  if (pendingJump) {
-    const j = pendingJump;
-    pendingJump = null;
-    openJumpModal(j);
-  }
+  openSettings();
 }

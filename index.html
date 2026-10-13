@@ -294,6 +294,13 @@
       </div>
       <div id="viewDateList"></div>
       <pre id="viewContent" style="white-space:pre-wrap; font-size:0.9rem; display:none;"></pre>
+      <textarea id="viewEditArea" style="display:none; min-height:50vh;"></textarea>
+      <div id="viewActions" style="display:none; gap:8px; margin-top:10px;">
+        <button class="reroll" id="editEntryBtn">✏️ この日を編集</button>
+        <button class="reroll" id="cancelEditBtn" style="display:none;">キャンセル</button>
+        <button class="save-btn" id="saveEditBtn" style="display:none; margin-top:0;">保存</button>
+      </div>
+      <p class="hint" id="viewStatus"></p>
     </div>
   </div>
 </div>
@@ -308,8 +315,10 @@
     <input type="text" id="repoInput" placeholder="obsidian-sync">
     <label class="field-label">ブランチ</label>
     <input type="text" id="branchInput" placeholder="main">
-    <label class="field-label">Daily Noteの保存先フォルダ</label>
-    <input type="text" id="pathInput" placeholder="01_Daily">
+    <label class="field-label">日記ファイルのパス(1ファイルにまとめて保存)</label>
+    <input type="text" id="pathInput" placeholder="01_Daily/日記.md">
+    <button class="add-question-btn" id="migrateBtn" style="margin-top:4px;">日付別ファイルを日記.mdに統合(1回だけ)</button>
+    <p class="hint" id="migrateStatus"></p>
     <p class="hint">Fine-grained PATは対象リポジトリのContentsをRead and writeに設定して発行してください。この情報はこの端末のブラウザ内にのみ保存されます。</p>
     <button class="close-settings" id="saveSettingsBtn">保存して閉じる</button>
   </div>

@@ -306,6 +306,7 @@ async function saveGoals() {
     await loadGoals();
     renderGoalTab();
     status.textContent = "保存しました ✓";
+    if (typeof playSaveSound === "function") playSaveSound(); // 保存の音(sound.js)
     if (typeof refreshNext === "function") refreshNext(); // 「次にやること」を出し直す(next.js)
   } catch (e) {
     status.textContent = "エラー: " + e.message + "(書いた内容は消えていません)";

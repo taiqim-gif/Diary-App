@@ -808,6 +808,7 @@ async function handleSave() {
 
     viewCache = { content: newContent };
     setStatus("保存しました ✓");
+    if (typeof playSaveSound === "function") playSaveSound(); // 保存の音(sound.js)
     clearForm();
     nextHint();
     loadLookback();
@@ -1006,6 +1007,7 @@ async function saveEditEntry() {
       extractDayText(newContent, currentViewDate) || "(空)";
     setViewMode("read");
     statusEl.textContent = "保存しました ✓";
+    if (typeof playSaveSound === "function") playSaveSound(); // 保存の音(sound.js)
   } catch (e) {
     statusEl.textContent = "エラー: " + e.message;
   } finally {

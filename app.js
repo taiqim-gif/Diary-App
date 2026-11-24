@@ -129,6 +129,9 @@ function hasSettings(s) {
   return !!(s && s.pat && s.owner && s.repo);
 }
 
+const SETTING_INPUTS = ["patInput", "ownerInput", "repoInput", "branchInput", "pathInput"];
+let settingsUnlocked = false; // 「設定を変更する」を押して、書き換えられる状態か
+
 function openSettings() {
   const s = loadSettings() || {};
   document.getElementById("patInput").value = s.pat || "";
@@ -136,8 +139,48 @@ function openSettings() {
   document.getElementById("repoInput").value = s.repo || "";
   document.getElementById("branchInput").value = s.branch || "main";
   document.getElementById("pathInput").value = diaryFilePath(s);
+  setPatVisible(false);
+  // まだ設定がないときだけ、最初から書き換えられる
+  setSettingsLock(!hasSettings(s));
+  document.getElementById("settingsMsg").textContent = "";
   document.getElementById("settings-panel").classList.add("open");
   document.getElementById("main-panel").classList.add("hidden");
+}
+
+// unlocked=true で書き換えられる。false のときは見る・コピーだけ
+function setSettingsLock(unlocked) {
+  settingsUnlocked = unlocked;
+  SETTING_INPUTS.forEach((id) => (document.getElementById(id).readOnly = !unlocked));
+  document.getElementById("unlockSettingsBtn").style.display = unlocked ? "none" : "block";
+  document.getElementById("unlockConfirm").classList.remove("open");
+  document.getElementById("saveSettingsBtn").textContent = unlocked ? "保存して閉じる" : "閉じる";
+}
+
+// トークンの表示・非表示(変更ボタンを押さなくても使える)
+function setPatVisible(show) {
+  document.getElementById("patInput").type = show ? "text" : "password";
+  document.getElementById("patShowBtn").textContent = show ? "隠す" : "表示";
+}
+
+async function copyPat() {
+  const msg = document.getElementById("settingsMsg");
+  const v = document.getElementById("patInput").value;
+  if (!v) {
+    msg.textContent = "トークンが入っていません";
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(v);
+  } catch (e) {
+    // 古い端末向け: 一時的な欄を選んでコピー
+    const t = document.createElement("textarea");
+    t.value = v;
+    document.body.appendChild(t);
+    t.select();
+    document.execCommand("copy");
+    t.remove();
+  }
+  msg.textContent = "トークンをコピーしました";
 }
 
 function settingsFromForm() {
@@ -151,9 +194,12 @@ function settingsFromForm() {
 }
 
 function closeSettings() {
-  saveSettingsToStorage(settingsFromForm());
   document.getElementById("settings-panel").classList.remove("open");
   document.getElementById("main-panel").classList.remove("hidden");
+  setPatVisible(false);
+  if (!settingsUnlocked) return; // 変更していないときは、保存も読み直しもしない
+  saveSettingsToStorage(settingsFromForm());
+  setSettingsLock(false);
   viewCache = null;
   weekTrialCache = {};
   loadLookback();
@@ -974,6 +1020,14 @@ document.querySelectorAll(".tab-btn").forEach((b) => {
 });
 on("gearBtn", "click", openSettings);
 on("saveSettingsBtn", "click", closeSettings);
+on("patShowBtn", "click", () => setPatVisible(document.getElementById("patInput").type === "password"));
+on("patCopyBtn", "click", copyPat);
+on("unlockSettingsBtn", "click", () => document.getElementById("unlockConfirm").classList.add("open"));
+on("unlockNoBtn", "click", () => document.getElementById("unlockConfirm").classList.remove("open"));
+on("unlockYesBtn", "click", () => {
+  setSettingsLock(true);
+  document.getElementById("settingsMsg").textContent = "書き換えられます。終わったら「保存して閉じる」を押してください";
+});
 on("beingEditBtn", "click", startEditBeing);
 on("hintNextBtn", "click", nextHint);
 on("browseQuestionsBtn", "click", openBrowseModal);
@@ -1002,10 +1056,20 @@ on("actBadBtn", "click", () => setAct("動けなかった"));
   (id) => on(id, "input", saveDraft)
 );
 
-// 日時は、手で変えていなければ1分ごとに今の時刻に合わせる
+// タイトルの下に「2026年11月 霜月」(西暦の年月と、和風月名)
+const WAFU_MONTHS = ["睦月", "如月", "弥生", "卯月", "皐月", "水無月", "文月", "葉月", "長月", "神無月", "霜月", "師走"];
+function renderHeadDate() {
+  const d = new Date();
+  document.getElementById("headDate").textContent =
+    `${d.getFullYear()}年${d.getMonth() + 1}月 ${WAFU_MONTHS[d.getMonth()]}`;
+}
+renderHeadDate();
+
+// 日時は、手で変えていなければ1分ごとに今の時刻に合わせる(月が変わったらタイトルの下も変える)
 document.getElementById("whenInput").value = localDateTimeValue(new Date());
 setInterval(() => {
   if (!timeTouched) document.getElementById("whenInput").value = localDateTimeValue(new Date());
+  renderHeadDate();
 }, 60000);
 
 document.getElementById("policyText").textContent = todayPolicy();

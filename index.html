@@ -30,7 +30,18 @@
     align-items: center;
     gap: 8px;
   }
-  h1 { font-size: 1.2rem; margin: 0; flex: 1; white-space: nowrap; }
+  .title-box { flex: 1; min-width: 0; }
+  h1 { font-size: 1.2rem; margin: 0; white-space: nowrap; }
+  /* 西暦の年月と、和風月名(霜月など) */
+  #headDate { font-size: 0.74rem; color: var(--accent); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+  /* GitHubの設定(ふだんは書き換えられない) */
+  input[readonly] { background: #f1f0ec; color: var(--muted); }
+  .pat-row { display: flex; gap: 6px; margin-bottom: 10px; }
+  .pat-row input { margin-bottom: 0; flex: 1; min-width: 0; }
+  .pat-row button { flex: none; }
+  .confirm-box { display: none; margin-top: 10px; padding: 10px; border: 1px solid #a5473b; border-radius: 10px; background: #fbf1ef; }
+  .confirm-box.open { display: block; }
+  .confirm-box p { margin: 0 0 8px; font-size: 0.9rem; }
   #wxHere { min-width: 0; }
   .gear {
     font-size: 1.4rem;
@@ -374,7 +385,10 @@
 <body>
 
 <header>
-  <h1>私の日記</h1>
+  <div class="title-box">
+    <h1>私の日記</h1>
+    <div id="headDate"></div>
+  </div>
   <span id="wxHere"></span>
   <button class="gear" id="gearBtn" aria-label="設定">⚙️</button>
 </header>
@@ -664,7 +678,11 @@
 <div id="settings-panel">
   <div class="card">
     <label class="field-label">GitHub Personal Access Token</label>
-    <input type="password" id="patInput" placeholder="github_pat_...">
+    <div class="pat-row">
+      <input type="password" id="patInput" placeholder="github_pat_..." autocomplete="off">
+      <button class="reroll" id="patShowBtn">表示</button>
+      <button class="reroll" id="patCopyBtn">コピー</button>
+    </div>
     <label class="field-label">リポジトリオーナー</label>
     <input type="text" id="ownerInput" placeholder="taiqim-gif">
     <label class="field-label">リポジトリ名</label>
@@ -674,7 +692,16 @@
     <label class="field-label">日記ファイルのパス(1ファイルにまとめて保存)</label>
     <input type="text" id="pathInput" placeholder="diary/日記.md">
     <p class="hint">Fine-grained PATは対象リポジトリのContentsをRead and writeに設定して発行してください。この情報はこの端末のブラウザ内にのみ保存されます。</p>
-    <button class="close-settings" id="saveSettingsBtn">保存して閉じる</button>
+    <p class="hint" id="settingsMsg"></p>
+    <button class="reroll" id="unlockSettingsBtn" style="width:100%; margin-bottom:10px;">🔒 設定を変更する</button>
+    <div class="confirm-box" id="unlockConfirm">
+      <p>本当に変えますか？ 間違えると日記が保存できなくなります。</p>
+      <div class="seg">
+        <button class="seg-btn" id="unlockYesBtn">変える</button>
+        <button class="seg-btn" id="unlockNoBtn">やめる</button>
+      </div>
+    </div>
+    <button class="close-settings" id="saveSettingsBtn">閉じる</button>
   </div>
 </div>
 

@@ -518,15 +518,21 @@ const CSS = `
 .jw-btn{ flex:none; display:inline-flex; align-items:center; gap:4px; border:none; background:transparent; font-family:inherit; padding:0; cursor:pointer; -webkit-tap-highlight-color:transparent; }
 .jw-btn[hidden], .jw-stale[hidden], .jw-sheet[hidden]{ display:none; }
 .jw-stale{ font-size:10px; color:#8A8F98; }
-.jw-grid{ display:grid; grid-template-columns:repeat(3, 52px); row-gap:1px; text-align:center; }
-.jw-r1{ color:#0B7A7A; font-size:15px; font-weight:700; white-space:pre; overflow:hidden; line-height:22px; height:22px; }
-.jw-grid.icons .jw-r1{ font-size:17px; }
-.jw-grid.temp .jw-r1{ font-size:13px; }
+.jw-grid{ display:grid; grid-template-columns:repeat(3, 58px); row-gap:1px; text-align:center; }
+/* 1段目は2行分の高さで固定(日の出・日の入の2段表示でも、ヘッダーの高さが変わらないように) */
+.jw-r1{ color:#0B7A7A; font-size:17px; font-weight:700; white-space:pre; overflow:hidden; line-height:20px; height:38px; display:flex; align-items:center; justify-content:center; }
+.jw-grid.icons .jw-r1{ font-size:19px; }
+.jw-grid.temp .jw-r1{ font-size:14.5px; }
+.jw-grid.sun .jw-r1{ font-size:13px; line-height:17px; }
 .jw-ic[data-ic="☀"]{ color:#E8890C; } .jw-ic[data-ic="☁"]{ color:#7D8A96; } .jw-ic[data-ic="☂"]{ color:#1F6FD1; }
 .jw-ic[data-ic="❄"]{ color:#2A9FD6; } .jw-ic[data-ic="⚡"]{ color:#C99700; }
 .jw-pc{ font-size:13px; } .jw-pv.dry{ font-size:12px; } .jw-pv.dry .jw-pc{ font-size:11px; }
 .jw-pv.wet, .jw-pv.wet .jw-pc{ color:#D62E2E; }
-.jw-r2{ color:#5B4A9E; font-size:11px; font-weight:700; line-height:1.2; }
+.jw-r2{ color:#5B4A9E; font-size:12px; font-weight:700; line-height:1.2; }
+.jw-speed{ margin-top:12px; }
+.jw-speed .jw-sp{ display:flex; flex-wrap:wrap; gap:6px; margin-top:4px; }
+.jw-speed button{ flex:1 1 auto; min-height:38px; padding:0 10px; border-radius:999px; font-size:13px; font-family:inherit; border:1px solid #5B4A9E; background:#fff; color:#5B4A9E; }
+.jw-speed button.on{ background:#5B4A9E; color:#fff; }
 .jw-grid.flip .jw-r1{ animation:jwFlip .4s ease-out; }
 @keyframes jwFlip{ from{ transform:perspective(220px) rotateX(-80deg); opacity:0; } to{ transform:perspective(220px) rotateX(0); opacity:1; } }
 @media (prefers-reduced-motion: reduce){ .jw-grid.flip .jw-r1{ animation:none; } }
@@ -570,7 +576,7 @@ function injectCss(){
 function mount(opts){
   const o = Object.assign({ storagePrefix:"jw", refreshMinutes:30, onDaily:null, defaultPoint:null, point:null }, opts || {});
   const K = { cache: o.storagePrefix + "Cache", speed: o.storagePrefix + "Speed", daily: o.storagePrefix + "Daily" };
-  const SPEEDS = [["3000","速い(3秒)"], ["3500","標準(3.5秒)"], ["4000","ゆっくり(4秒)"], ["stop","止める"]];
+  const SPEEDS = [["2000","速い(2秒)"], ["3500","標準(3.5秒)"], ["5000","ゆっくり(5秒)"], ["8000","とてもゆっくり(8秒)"], ["stop","止める"]];
   const ls = {                                                 // 保存できない端末(プライベートモードなど)でも、止まらないように
     get(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } },
     set(k, v){ try{ localStorage.setItem(k, v); }catch(e){ /* 保存できなくても、表示は続ける */ } }
@@ -594,8 +600,8 @@ function mount(opts){
   sheet.hidden = true;
   document.body.appendChild(sheet);
 
-  let mode = 0;                                                // 0=アイコン 1=降水確率 2=気温 3=月齢 4=日の出 5=日の入
-  const MODES = 6;
+  let mode = 0;                                                // 0=アイコン 1=降水確率 2=気温 3=月齢 4=日の出・日の入(2段)
+  const MODES = 5;
   function cols(){
     const d = load();
     if(!d || !d.weathers || !d.weathers.length) return null;
@@ -610,8 +616,8 @@ function mount(opts){
     if(mode === 1) return c.pop != null ? `<span class="jw-pv ${c.pop >= 30 ? "wet" : "dry"}">${esc(c.pop)}<span class="jw-pc">%</span></span>` : "--";
     // 月齢・日の出・日の入も、天気と同じように順番に出す(ヘッダーだけで分かるように)
     if(mode === 3) return c.moon ? `${moonIcon(c.moon.elong, 15)}${esc(c.moon.age.toFixed(1))}` : "--";
-    if(mode === 4) return c.rise != null ? `<span class="jw-sun">↑</span>${esc(hmText(c.rise))}` : "--";
-    if(mode === 5) return c.set != null ? `<span class="jw-sun">↓</span>${esc(hmText(c.set))}` : "--";
+    if(mode === 4) return c.rise != null && c.set != null
+      ? `<span><span class="jw-sun">↑</span>${esc(hmText(c.rise))}<br><span class="jw-sun">↓</span>${esc(hmText(c.set))}</span>` : "--";   // 上=日の出、下=日の入
     const t = v => v != null ? `<span style="color:${tempColor(v)}">${esc(v)}</span>` : "--";
     return `${t(c.max)}/${t(c.min)}`;
   }
@@ -625,7 +631,8 @@ function mount(opts){
     const g = btn.querySelector(".jw-grid");
     g.classList.toggle("icons", mode === 0);
     g.classList.toggle("pop", mode === 1);
-    g.classList.toggle("temp", mode >= 2);
+    g.classList.toggle("temp", mode === 2 || mode === 3);
+    g.classList.toggle("sun", mode === 4);
     if(flip && !reduced()){ g.classList.remove("flip"); void g.offsetWidth; g.classList.add("flip"); }
   }
   function step(dir){ mode = ((mode + dir) % MODES + MODES) % MODES; render(true); }
@@ -708,7 +715,11 @@ function mount(opts){
       `<div class="jw-nm">${esc(m.name)}・${esc(m.trend)}</div>` +
       `<div class="jw-np">光っている部分 ${esc(m.illum)}%</div><div class="jw-np">${np}</div></div></div>`;
     const pt = d.point || {};
-    sheet.innerHTML = `<h3>天気(気象庁) ${esc(d.areaName)} <small>気温: ${esc(d.tempName || pt.name || "")}</small></h3>` + table1 + table2 + moonBox +
+    // ヘッダーの切り替えの速さ(この端末に残す)
+    const speedBox = `<div class="jw-speed"><div class="jw-sub" style="margin-top:0">上の表示が切り替わる速さ</div><div class="jw-sp">` +
+      SPEEDS.map(([v, label]) => `<button type="button" data-jw="speed:${esc(v)}" class="${speed() === v ? "on" : ""}">${esc(label)}</button>`).join("") +
+      `</div>${speed() === "stop" ? `<div class="jw-note" style="margin-top:4px">止めているときは、タップで次へ、長押しでこの画面です</div>` : ""}</div>`;
+    sheet.innerHTML = `<h3>天気(気象庁) ${esc(d.areaName)} <small>気温: ${esc(d.tempName || pt.name || "")}</small></h3>` + table1 + table2 + moonBox + speedBox +
       `<div class="jw-note">発表 ${esc(hm(d.report))}　取得 ${esc(hm(d.fetchedAt))}　出典: 気象庁ホームページ(予報区ごとの予報で、地点の天気とは異なる場合があります)。` +
       `日の出・日の入は${esc(pt.name || "地点")}の位置で計算。その時刻の気温は、最高・最低からの推定(「約」)です。月齢は表では正午、絵は今の形です。</div>` +
       `<div class="jw-btns"><button type="button" data-jw="refresh">更新</button><button type="button" class="jw-primary" data-jw="close">閉じる</button></div>`;
@@ -735,7 +746,9 @@ function mount(opts){
   sheet.addEventListener("click", e => {
     const b = e.target.closest("[data-jw]");
     if(!b) return;
-    if(b.getAttribute("data-jw") === "close") sheet.hidden = true;
+    const act = b.getAttribute("data-jw");
+    if(act === "close") sheet.hidden = true;
+    else if(act.startsWith("speed:")){ ls.set(K.speed, act.slice(6)); restart(); showSheet(); }   // 速さを変えて、すぐに反映
     else refresh(true);
   });
   document.addEventListener("pointerdown", e => { if(!sheet.hidden && !sheet.contains(e.target) && !btn.contains(e.target)) sheet.hidden = true; });

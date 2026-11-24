@@ -518,10 +518,10 @@ const CSS = `
 .jw-btn{ flex:none; display:inline-flex; align-items:center; gap:4px; border:none; background:transparent; font-family:inherit; padding:0; cursor:pointer; -webkit-tap-highlight-color:transparent; }
 .jw-btn[hidden], .jw-stale[hidden], .jw-sheet[hidden]{ display:none; }
 .jw-stale{ font-size:10px; color:#8A8F98; }
-.jw-grid{ display:grid; grid-template-columns:repeat(3, 72px); row-gap:1px; text-align:center; }
+.jw-grid{ display:grid; grid-template-columns:repeat(3, 62px); row-gap:1px; text-align:center; }
 /* 1段目は2行分の高さで固定(日の出・日の入の2段表示でも、ヘッダーの高さが変わらないように) */
 .jw-r1{ color:#0B7A7A; font-size:21px; font-weight:700; white-space:pre; overflow:hidden; line-height:24px; height:44px; display:flex; align-items:center; justify-content:center; }
-.jw-grid.icons .jw-r1{ font-size:30px; }
+.jw-grid.icons .jw-r1{ font-size:27px; }
 .jw-grid.temp .jw-r1{ font-size:18.5px; }
 .jw-grid.sun .jw-r1{ font-size:21px; }
 .jw-grid.tempv .jw-r1{ font-size:21px; letter-spacing:-0.5px; }

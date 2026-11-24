@@ -350,7 +350,15 @@ function clearForm() {
   renderActButtons();
   lsRemove(DRAFT_KEY);
   timeTouched = false;
-  document.getElementById("whenInput").value = localDateTimeValue(new Date());
+  setWhen(new Date());
+}
+
+// 日時を入れる(隠した whenInput と、見えている日付・時刻の欄の両方)
+function setWhen(d) {
+  const v = localDateTimeValue(d); // 2026-11-25T21:30
+  document.getElementById("whenInput").value = v;
+  document.getElementById("whenDate").value = v.slice(0, 10);
+  document.getElementById("whenTime").value = v.slice(11, 16);
 }
 
 // ---------- 今日は動けた？ ----------
@@ -1058,10 +1066,17 @@ on("closeViewBtn", "click", closeViewModal);
 on("editEntryBtn", "click", startEditEntry);
 on("cancelEditBtn", "click", cancelEditEntry);
 on("saveEditBtn", "click", saveEditEntry);
-on("whenInput", "change", () => {
-  timeTouched = true;
-  loadTrialChecks(); // 日付を変えたら、その日の前の日の「試すこと」に変える
-});
+// 日付・時刻の欄を手で変えたら、隠した whenInput にまとめる
+["whenDate", "whenTime"].forEach((id) =>
+  on(id, "change", () => {
+    const d = document.getElementById("whenDate").value;
+    const t = document.getElementById("whenTime").value || "00:00";
+    if (!d) return;
+    document.getElementById("whenInput").value = `${d}T${t}`;
+    timeTouched = true;
+    loadTrialChecks(); // 日付を変えたら、その日の前の日の「試すこと」に変える
+  })
+);
 on("actGoodBtn", "click", () => setAct("動けた"));
 on("actBadBtn", "click", () => setAct("動けなかった"));
 ["titleInput", "bodyInput", "hintAnswer", "trialInput", "conditionSelect", "sleepInput"].forEach(
@@ -1150,9 +1165,9 @@ function renderHeadDate() {
 renderHeadDate();
 
 // 日時は、手で変えていなければ1分ごとに今の時刻に合わせる(月が変わったらタイトルの下も変える)
-document.getElementById("whenInput").value = localDateTimeValue(new Date());
+setWhen(new Date());
 setInterval(() => {
-  if (!timeTouched) document.getElementById("whenInput").value = localDateTimeValue(new Date());
+  if (!timeTouched) setWhen(new Date());
   renderHeadDate();
   if (currentTheme() === "season") applyTheme("season"); // 月が変わったら色も変える
 }, 60000);

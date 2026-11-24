@@ -207,7 +207,8 @@
     background: none;
     padding: 10px 0;
     border-radius: 9px;
-    font-size: 0.95rem;
+    font-size: clamp(0.8rem, 4.3vw, 0.95rem); /* せまい画面でも「振り返り」が1行に入るように */
+    white-space: nowrap;
     font-weight: 600;
     color: var(--on-accent);
     opacity: 0.85;
@@ -288,17 +289,26 @@
     color: var(--text);
     font-family: inherit;
   }
-  /* 日時の欄がカードからはみ出さないように(スマホの日時欄は、幅の指定を無視しやすい) */
-  input[type=datetime-local] {
-    display: block;
-    max-width: 100%;
+  /* 日付と時刻の欄(横に2つ。カードからはみ出さないように) */
+  .when-row { display: flex; gap: 8px; margin-bottom: 10px; }
+  .when-row input {
+    flex: 1 1 0;
     min-width: 0;
+    width: 0;
+    margin-bottom: 0;
+    padding: 10px 8px;
+    font-size: 1rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--field);
+    color: var(--text);
+    font-family: inherit;
     -webkit-appearance: none;
     appearance: none;
     min-height: 2.6em;
-    text-align: left;
   }
-  input[type=datetime-local]::-webkit-date-and-time-value { text-align: left; }
+  .when-row input[type=time] { flex: 0 1 40%; }
+  .when-row input::-webkit-date-and-time-value { text-align: left; }
   .condition-row { display: flex; gap: 12px; }
   .condition-col { flex: 1; min-width: 0; }
   select, input[type=number] {
@@ -541,7 +551,12 @@
   <section class="tab-panel" id="tab-diary">
     <div class="card">
       <label class="field-label">日時</label>
-      <input type="datetime-local" id="whenInput">
+      <!-- 日付と時刻を分けて置く(1つの欄だとスマホで枠からはみ出すため)。保存に使うのは隠した whenInput -->
+      <div class="when-row">
+        <input type="date" id="whenDate">
+        <input type="time" id="whenTime">
+      </div>
+      <input type="hidden" id="whenInput">
       <label class="field-label">タイトル</label>
       <input type="text" id="titleInput" placeholder="今日をひとことで">
       <label class="field-label">本文(自由に)</label>
@@ -828,11 +843,11 @@
   </div>
 </div>
 
-<script src="questions.js?v=20261125e"></script>
-<script src="jma-weather.js?v=20261125e"></script>
-<script src="app.js?v=20261125e"></script>
-<script src="review.js?v=20261125e"></script>
-<script src="goal.js?v=20261125e"></script>
-<script src="analysis.js?v=20261125e"></script>
+<script src="questions.js?v=20261125f"></script>
+<script src="jma-weather.js?v=20261125f"></script>
+<script src="app.js?v=20261125f"></script>
+<script src="review.js?v=20261125f"></script>
+<script src="goal.js?v=20261125f"></script>
+<script src="analysis.js?v=20261125f"></script>
 </body>
 </html>

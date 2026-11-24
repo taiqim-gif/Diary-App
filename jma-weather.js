@@ -518,19 +518,19 @@ const CSS = `
 .jw-btn{ flex:none; display:inline-flex; align-items:center; gap:4px; border:none; background:transparent; font-family:inherit; padding:0; cursor:pointer; -webkit-tap-highlight-color:transparent; }
 .jw-btn[hidden], .jw-stale[hidden], .jw-sheet[hidden]{ display:none; }
 .jw-stale{ font-size:10px; color:#8A8F98; }
-.jw-grid{ display:grid; grid-template-columns:repeat(3, 66px); row-gap:1px; text-align:center; }
+.jw-grid{ display:grid; grid-template-columns:repeat(3, 72px); row-gap:1px; text-align:center; }
 /* 1段目は2行分の高さで固定(日の出・日の入の2段表示でも、ヘッダーの高さが変わらないように) */
-.jw-r1{ color:#0B7A7A; font-size:19px; font-weight:700; white-space:pre; overflow:hidden; line-height:22px; height:40px; display:flex; align-items:center; justify-content:center; }
-.jw-grid.icons .jw-r1{ font-size:27px; }
-.jw-grid.temp .jw-r1{ font-size:16.5px; }
-.jw-grid.sun .jw-r1{ font-size:19px; }
+.jw-r1{ color:#0B7A7A; font-size:21px; font-weight:700; white-space:pre; overflow:hidden; line-height:24px; height:44px; display:flex; align-items:center; justify-content:center; }
+.jw-grid.icons .jw-r1{ font-size:30px; }
+.jw-grid.temp .jw-r1{ font-size:18.5px; }
+.jw-grid.sun .jw-r1{ font-size:21px; }
 .jw-grid.sun .jw-r2{ display:flex; }
 .jw-half{ flex:1; text-align:center; }
 .jw-ic[data-ic="☀"]{ color:#E8890C; } .jw-ic[data-ic="☁"]{ color:#7D8A96; } .jw-ic[data-ic="☂"]{ color:#1F6FD1; }
 .jw-ic[data-ic="❄"]{ color:#2A9FD6; } .jw-ic[data-ic="⚡"]{ color:#C99700; }
-.jw-pc{ font-size:14px; } .jw-pv.dry{ font-size:16px; } .jw-pv.dry .jw-pc{ font-size:13px; }
+.jw-pc{ font-size:15px; } .jw-pv.dry{ font-size:18px; } .jw-pv.dry .jw-pc{ font-size:14px; }
 .jw-pv.wet, .jw-pv.wet .jw-pc{ color:#D62E2E; }
-.jw-r2{ color:#5B4A9E; font-size:15.5px; font-weight:700; line-height:1.2; white-space:nowrap; }
+.jw-r2{ color:#5B4A9E; font-size:16.5px; font-weight:700; line-height:1.2; white-space:nowrap; }
 .jw-speed{ margin-top:12px; }
 .jw-speed .jw-sp{ display:flex; flex-wrap:wrap; gap:6px; margin-top:4px; }
 .jw-speed button{ flex:1 1 auto; min-height:38px; padding:0 10px; border-radius:999px; font-size:13px; font-family:inherit; border:1px solid #5B4A9E; background:#fff; color:#5B4A9E; }
@@ -617,7 +617,7 @@ function mount(opts){
     if(mode === 0) return c.icons ? Array.from(c.icons).map(ch => `<span class="jw-ic" data-ic="${esc(ch)}">${esc(ch)}</span>`).join("") : "--";
     if(mode === 1) return c.pop != null ? `<span class="jw-pv ${c.pop >= 30 ? "wet" : "dry"}">${esc(c.pop)}<span class="jw-pc">%</span></span>` : "--";
     // 月齢・日の出・日の入も、天気と同じように順番に出す(ヘッダーだけで分かるように)
-    if(mode === 3) return c.moon ? `${moonIcon(c.moon.elong, 15)}${esc(c.moon.age.toFixed(1))}` : "--";
+    if(mode === 3) return c.moon ? `${moonIcon(c.moon.elong, 19)}${esc(c.moon.age.toFixed(1))}` : "--";
     const t = v => v != null ? `<span style="color:${tempColor(v)}">${esc(v)}</span>` : "--";
     return `${t(c.max)}/${t(c.min)}`;
   }

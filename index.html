@@ -13,14 +13,14 @@
   /* 見た目(テーマ)。設定画面で切り替え、<html data-theme="..."> で色を差し替える */
   /* 標準・藍ブルー(いつもの見た目) */
   :root {
-    --bg: #d9e3f2;
+    --bg: #a9c2e8;
     --card: #ffffff;
     --accent: #1f3f80;
     --accent-soft: #cddaf0;
     --on-accent: #ffffff;
     --text: #141820;
     --muted: #5b6474;
-    --border: #b9c7de;
+    --border: #8fa9d4;
     --field: #f7f9fc;
     --readonly: #e3e9f2;
     --good: #2e7d5b;
@@ -32,21 +32,21 @@
   }
   /* 標準・グリーン */
   :root[data-theme="green"] {
-    --bg: #d5e8db;
+    --bg: #a6d3b6;
     --accent: #1e5c3f;
     --accent-soft: #c6e0cf;
-    --border: #a9cdb5;
+    --border: #82b893;
     --readonly: #e0eee4;
   }
   /* 和風: 生成りの紙に、藍・朱・抹茶 */
   :root[data-theme="wa"] {
-    --bg: #e3d5b8;
+    --bg: #d2bb8c;
     --card: #fbf7ee;
     --accent: #1d4466;
     --accent-soft: #d8dfe3;
     --text: #231e18;
     --muted: #6e6352;
-    --border: #c9b896;
+    --border: #b09a6c;
     --field: #fffdf8;
     --readonly: #efe9dc;
     --good: #4d6e2c;
@@ -57,8 +57,8 @@
   }
   /* 夜: 黒に近い紺に、月のような淡い金 */
   :root[data-theme="night"] {
-    --bg: #070c18;
-    --card: #18244a;
+    --bg: #0a1a44;
+    --card: #1d2f62;
     --accent: #f0c860;
     --accent-soft: #2a3a66;
     --on-accent: #1a1d26;
@@ -123,7 +123,7 @@
   .title-box { flex: 1; min-width: 0; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
   h1 { font-size: 1.2rem; margin: 0; white-space: nowrap; }
   /* 西暦の年月と、和風月名(霜月など) */
-  #headDate { font-size: 0.74rem; color: var(--accent); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+  #headDate { font-size: 0.98rem; color: var(--accent); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
   /* GitHubの設定(ふだんは書き換えられない) */
   input[readonly] { background: var(--readonly); color: var(--muted); }
   .pat-row { display: flex; gap: 6px; margin-bottom: 10px; }

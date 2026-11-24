@@ -92,7 +92,11 @@
   }
   h1, .rv-week, .modal-header strong { font-family: var(--head-font); }
   /* 天気の部品の色も、テーマに合わせる */
-  #wxHere .jw-r2 { color: var(--accent); }
+  /* 天気の日付の段は、色の帯にして上の段と分ける */
+  #wxHere .jw-r2 { color: var(--on-accent); background: var(--accent); padding: 1px 0 2px; }
+  #wxHere .jw-r2:nth-child(4), #wxHere .jw-grid.sun .jw-r2 { border-bottom-left-radius: 8px; }
+  #wxHere .jw-r2:last-child, #wxHere .jw-grid.sun .jw-r2 { border-bottom-right-radius: 8px; }
+  #wxHere .jw-grid { row-gap: 0; }
   :root[data-theme="night"] #wxHere .jw-r1 { color: #8ce6e0; }
   :root[data-theme="night"] .jw-sheet { background: var(--card); color: var(--text); border-top-color: var(--border); }
   :root[data-theme="night"] .jw-tbl th, :root[data-theme="night"] .jw-tbl td { border-color: var(--border); }
@@ -813,11 +817,11 @@
   </div>
 </div>
 
-<script src="questions.js"></script>
-<script src="jma-weather.js"></script>
-<script src="app.js"></script>
-<script src="review.js"></script>
-<script src="goal.js"></script>
-<script src="analysis.js"></script>
+<script src="questions.js?v=20261125d"></script>
+<script src="jma-weather.js?v=20261125d"></script>
+<script src="app.js?v=20261125d"></script>
+<script src="review.js?v=20261125d"></script>
+<script src="goal.js?v=20261125d"></script>
+<script src="analysis.js?v=20261125d"></script>
 </body>
 </html>

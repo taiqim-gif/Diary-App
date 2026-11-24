@@ -186,20 +186,25 @@
     display: flex;
     gap: 4px;
     margin-bottom: 14px;
-    background: var(--accent-soft);
+    /* タブの帯は濃い色で、はっきり見えるように */
+    background: var(--accent);
     border-radius: 12px;
     padding: 4px;
+    box-shadow: var(--shadow);
   }
   .tab-btn {
     flex: 1;
     border: none;
     background: none;
-    padding: 9px 0;
+    padding: 10px 0;
     border-radius: 9px;
-    font-size: 0.9rem;
-    color: var(--accent);
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--on-accent);
+    opacity: 0.85;
   }
-  .tab-btn.active { background: var(--card); font-weight: 700; box-shadow: 0 1px 2px rgba(0,0,0,0.08); }
+  /* 選んでいるタブは白く抜いて、文字を濃い色に */
+  .tab-btn.active { background: var(--card); color: var(--accent); font-weight: 800; opacity: 1; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
   .tab-panel { display: none; }
   .tab-panel.active { display: block; }
   .coming { text-align: center; color: var(--muted); padding: 30px 10px; line-height: 1.7; }

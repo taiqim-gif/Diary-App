@@ -524,6 +524,7 @@ const CSS = `
 .jw-grid.icons .jw-r1{ font-size:30px; }
 .jw-grid.temp .jw-r1{ font-size:18.5px; }
 .jw-grid.sun .jw-r1{ font-size:21px; }
+.jw-grid.tempv .jw-r1{ font-size:21px; letter-spacing:-0.5px; }
 .jw-grid.sun .jw-r2{ display:flex; }
 .jw-half{ flex:1; text-align:center; }
 .jw-ic[data-ic="☀"]{ color:#E8890C; } .jw-ic[data-ic="☁"]{ color:#7D8A96; } .jw-ic[data-ic="☂"]{ color:#1F6FD1; }
@@ -621,17 +622,17 @@ function mount(opts){
     const t = v => v != null ? `<span style="color:${tempColor(v)}">${esc(v)}</span>` : "--";
     return `${t(c.max)}/${t(c.min)}`;
   }
-  // 日の出・日の入は3日分の平均を1つだけ出す。矢印は、今日から明後日にかけて早くなる(←)か遅くなる(→)か
+  // 日の出・日の入は3日分の平均を1つだけ出す。時刻の右に矢印: 今日から明後日にかけて早くなる=↓、遅くなる=↑
   function sunHtml(cs){
     const avg = a => a.reduce((x, y) => x + y, 0) / a.length;
-    const one = (key, arrowLeft) => {
+    const one = key => {
       const v = cs.map(c => c[key]).filter(x => x != null && isFinite(x));
       if(!v.length) return "--";
-      const diff = v[v.length - 1] - v[0], ar = diff < 0 ? "←" : diff > 0 ? "→" : "";
+      const diff = v[v.length - 1] - v[0], ar = diff < 0 ? "↓" : diff > 0 ? "↑" : "";
       const a = ar ? `<span class="jw-sun">${ar}</span>` : "";
-      return arrowLeft ? `${a}${esc(hmText(avg(v)))}` : `${esc(hmText(avg(v)))}${a}`;
+      return `${esc(hmText(avg(v)))}${a}`;
     };
-    return `<span class="jw-half">${one("rise", true)}</span><span class="jw-half">${one("set", false)}</span>`;
+    return `<span class="jw-half">${one("rise")}</span><span class="jw-half">${one("set")}</span>`;
   }
   function render(flip){
     const cs = cols(), d = load();
@@ -654,6 +655,7 @@ function mount(opts){
     g.classList.toggle("icons", mode === 0);
     g.classList.toggle("pop", mode === 1);
     g.classList.toggle("temp", mode === 2 || mode === 3);
+    g.classList.toggle("tempv", mode === 2);                    // 気温だけ、さらに大きく
     g.classList.toggle("sun", mode === 4);
     if(flip && !reduced()){ g.classList.remove("flip"); void g.offsetWidth; g.classList.add("flip"); }
   }

@@ -812,6 +812,7 @@ async function handleSave() {
     nextHint();
     loadLookback();
     loadTrialChecks();
+    if (typeof refreshNext === "function") refreshNext(); // 「次にやること」を出し直す(next.js)
   } catch (e) {
     console.error(e);
     setStatus("エラー: " + e.message + "(書いた内容は消えていません)");

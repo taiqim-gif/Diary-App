@@ -441,6 +441,7 @@ async function saveReview() {
     status.textContent = "保存しました ✓(22時のClaudeのチェックで読まれます)";
     if (typeof weekTrialCache !== "undefined") weekTrialCache = {}; // 日記タブの「今週試すこと」を読み直す
     if (typeof loadTrialChecks === "function") loadTrialChecks();
+    if (typeof refreshNext === "function") refreshNext(); // 「次にやること」を出し直す(next.js)
     checkSavedReview();
   } catch (e) {
     status.textContent = "エラー: " + e.message + "(書いた内容は消えていません)";

@@ -164,6 +164,33 @@
     border: 1px solid var(--border);
   }
 
+  /* 次にやること */
+  .next-card { padding: 0; overflow: hidden; border: 2px solid var(--accent); }
+  .next-card.none { padding: 10px 14px; border-width: 1px; border-color: var(--border); }
+  .next-head {
+    display: flex; flex-direction: column; gap: 2px; width: 100%;
+    background: var(--accent); color: var(--on-accent); border: none;
+    padding: 10px 14px; text-align: left; font: inherit; cursor: pointer;
+  }
+  .next-head .next-label { color: var(--on-accent); opacity: 0.9; }
+  .next-label { font-size: 0.72rem; font-weight: 700; color: var(--accent); display: flex; justify-content: space-between; }
+  .next-rest { font-weight: 600; }
+  .next-title { font-size: 1.05rem; font-weight: 800; }
+  .next-prog { font-size: 0.78rem; opacity: 0.9; }
+  .next-none { font-size: 0.9rem; color: var(--muted); }
+  .next-steps { margin: 0; padding: 10px 14px 4px 34px; }
+  .next-steps li { margin-bottom: 8px; line-height: 1.5; }
+  .next-steps li.done { color: var(--muted); list-style: none; margin-left: -18px; }
+  .next-steps li.cur { font-weight: 700; }
+  .next-btns { display: flex; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
+  .next-btns button, .next-back {
+    font: inherit; font-size: 0.9rem; border-radius: 10px; padding: 7px 14px; cursor: pointer;
+  }
+  .next-ok { background: var(--good); color: #fff; border: none; font-weight: 700; }
+  .next-act { background: var(--card); color: var(--accent); border: 2px solid var(--accent); font-weight: 700; }
+  .next-left { font-size: 0.8rem; color: var(--muted); padding: 0 14px 6px; }
+  .next-back { background: none; border: 1px solid var(--border); color: var(--muted); margin: 0 14px 10px; font-size: 0.8rem; padding: 4px 10px; }
+
   /* ありたい姿と今日の行動方針 */
   .being-card { padding: 12px 14px; }
   .being-row { display: flex; gap: 8px; align-items: flex-start; }
@@ -525,6 +552,9 @@
 </header>
 
 <div id="main-panel">
+  <!-- 次にやること(1つだけ出す。タップで手順を1つずつ。中身は next.js が作る) -->
+  <div class="card next-card none" id="nextCard"><div class="next-label">次にやること</div><div class="next-none">読み込み中...</div></div>
+
   <!-- ありたい姿と、規格外さんの今日の行動方針(いつも上に出す) -->
   <div class="card being-card">
     <div id="beingView" class="being-row">
@@ -843,11 +873,12 @@
   </div>
 </div>
 
-<script src="questions.js?v=20261125f"></script>
-<script src="jma-weather.js?v=20261125f"></script>
-<script src="app.js?v=20261125f"></script>
-<script src="review.js?v=20261125f"></script>
-<script src="goal.js?v=20261125f"></script>
-<script src="analysis.js?v=20261125f"></script>
+<script src="questions.js?v=20261125g"></script>
+<script src="jma-weather.js?v=20261125g"></script>
+<script src="app.js?v=20261125g"></script>
+<script src="review.js?v=20261125g"></script>
+<script src="goal.js?v=20261125g"></script>
+<script src="analysis.js?v=20261125g"></script>
+<script src="next.js?v=20261125g"></script>
 </body>
 </html>

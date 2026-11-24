@@ -518,10 +518,10 @@ const CSS = `
 .jw-btn{ flex:none; display:inline-flex; align-items:center; gap:4px; border:none; background:transparent; font-family:inherit; padding:0; cursor:pointer; -webkit-tap-highlight-color:transparent; }
 .jw-btn[hidden], .jw-stale[hidden], .jw-sheet[hidden]{ display:none; }
 .jw-stale{ font-size:10px; color:#8A8F98; }
-.jw-grid{ display:grid; grid-template-columns:repeat(3, 58px); row-gap:1px; text-align:center; }
+.jw-grid{ display:grid; grid-template-columns:repeat(3, 62px); row-gap:1px; text-align:center; }
 /* 1段目は2行分の高さで固定(日の出・日の入の2段表示でも、ヘッダーの高さが変わらないように) */
 .jw-r1{ color:#0B7A7A; font-size:17px; font-weight:700; white-space:pre; overflow:hidden; line-height:20px; height:38px; display:flex; align-items:center; justify-content:center; }
-.jw-grid.icons .jw-r1{ font-size:19px; }
+.jw-grid.icons .jw-r1{ font-size:24px; }
 .jw-grid.temp .jw-r1{ font-size:14.5px; }
 .jw-grid.sun .jw-r1{ font-size:17px; }
 .jw-grid.sun .jw-r2{ display:flex; }
@@ -530,7 +530,7 @@ const CSS = `
 .jw-ic[data-ic="❄"]{ color:#2A9FD6; } .jw-ic[data-ic="⚡"]{ color:#C99700; }
 .jw-pc{ font-size:13px; } .jw-pv.dry{ font-size:12px; } .jw-pv.dry .jw-pc{ font-size:11px; }
 .jw-pv.wet, .jw-pv.wet .jw-pc{ color:#D62E2E; }
-.jw-r2{ color:#5B4A9E; font-size:12px; font-weight:700; line-height:1.2; }
+.jw-r2{ color:#5B4A9E; font-size:14px; font-weight:700; line-height:1.2; white-space:nowrap; }
 .jw-speed{ margin-top:12px; }
 .jw-speed .jw-sp{ display:flex; flex-wrap:wrap; gap:6px; margin-top:4px; }
 .jw-speed button{ flex:1 1 auto; min-height:38px; padding:0 10px; border-radius:999px; font-size:13px; font-family:inherit; border:1px solid #5B4A9E; background:#fff; color:#5B4A9E; }

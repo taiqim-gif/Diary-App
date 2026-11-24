@@ -152,6 +152,8 @@ function closeSettings() {
   document.getElementById("main-panel").classList.remove("hidden");
   viewCache = null;
   loadLookback();
+  // 新しいトークンで、ありたい姿も読み直す(goal.js)
+  if (typeof loadGoals === "function") loadGoals().catch(() => {});
 }
 
 // ---------- タブ ----------
@@ -165,6 +167,8 @@ function showTab(name) {
   });
   // 振り返りタブを開いたら、その週の日記を読み直す(review.js)
   if (name === "review" && typeof openReviewTab === "function") openReviewTab();
+  // 目標タブを開いたら、GitHubの目標を読み直す(goal.js)
+  if (name === "goal" && typeof openGoalTab === "function") openGoalTab();
 }
 
 // ---------- ありたい姿と今日の行動方針 ----------
@@ -176,22 +180,10 @@ function renderBeing() {
   el.classList.toggle("empty", !text);
 }
 
+// ✏️ は目標タブを開く(ありたい姿は目標タブで書き、GitHubに保存する)
 function startEditBeing() {
-  document.getElementById("beingEdit").value = lsGet(BEING_KEY) || "";
-  document.getElementById("beingView").style.display = "none";
-  document.getElementById("beingForm").style.display = "block";
-}
-
-function saveBeing() {
-  lsSet(BEING_KEY, document.getElementById("beingEdit").value.trim());
-  document.getElementById("beingForm").style.display = "none";
-  document.getElementById("beingView").style.display = "flex";
-  renderBeing();
-}
-
-function cancelBeing() {
-  document.getElementById("beingForm").style.display = "none";
-  document.getElementById("beingView").style.display = "flex";
+  showTab("goal");
+  document.getElementById("tab-goal").scrollIntoView({ behavior: "smooth" });
 }
 
 // 日付で決まるので、同じ日は同じ方針が出る
@@ -490,6 +482,13 @@ function normalizeImportedDay(date, raw) {
 
 // ---------- GitHub API ----------
 
+// 401/403 のときに、何をすればよいかを添える
+function authHint(status) {
+  if (status === 401) return "(トークンの期限切れか入力ミス。⚙️ で新しいトークンを入れてください)";
+  if (status === 403) return "(トークンの権限不足。Contents を Read and write にしてください)";
+  return "";
+}
+
 async function githubGetFile(settings, filePath) {
   const url = `https://api.github.com/repos/${settings.owner}/${settings.repo}/contents/${filePath}?ref=${settings.branch}`;
   const res = await fetch(url, {
@@ -500,7 +499,7 @@ async function githubGetFile(settings, filePath) {
     cache: "no-store",
   });
   if (res.status === 404) return { content: null, sha: null };
-  if (!res.ok) throw new Error(`GitHub取得エラー: ${res.status}`);
+  if (!res.ok) throw new Error(`GitHub取得エラー: ${res.status}${authHint(res.status)}`);
   const data = await res.json();
   return { content: b64DecodeUnicode(data.content), sha: data.sha };
 }
@@ -520,7 +519,7 @@ async function githubPutFile(settings, filePath, content, sha, message) {
   });
   if (!res.ok) {
     const errText = await res.text();
-    throw new Error(`GitHub保存エラー: ${res.status} ${errText}`);
+    throw new Error(`GitHub保存エラー: ${res.status}${authHint(res.status)} ${errText}`);
   }
 }
 
@@ -532,7 +531,7 @@ async function githubListFolder(settings, folderPath) {
       Accept: "application/vnd.github+json",
     },
   });
-  if (!res.ok) throw new Error(`一覧取得エラー: ${res.status}`);
+  if (!res.ok) throw new Error(`一覧取得エラー: ${res.status}${authHint(res.status)}`);
   return res.json();
 }
 
@@ -828,8 +827,6 @@ document.querySelectorAll(".tab-btn").forEach((b) => {
 on("gearBtn", "click", openSettings);
 on("saveSettingsBtn", "click", closeSettings);
 on("beingEditBtn", "click", startEditBeing);
-on("beingSaveBtn", "click", saveBeing);
-on("beingCancelBtn", "click", cancelBeing);
 on("hintNextBtn", "click", nextHint);
 on("browseQuestionsBtn", "click", openBrowseModal);
 on("closeBrowseBtn", "click", closeBrowseModal);

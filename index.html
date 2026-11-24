@@ -312,6 +312,26 @@
   .rv-trial { padding: 8px 0; border-top: 1px solid var(--border); font-size: 0.9rem; }
   .rv-trial:first-child { border-top: none; }
   .rv-trial input { margin: 6px 0 0; }
+  /* 目標タブ */
+  .gl-goal { border-top: 1px solid var(--border); padding: 8px 0; }
+  .gl-goal:first-child { border-top: none; padding-top: 0; }
+  .gl-goal input { margin-bottom: 6px; }
+  .gl-states { display: flex; gap: 4px; align-items: center; margin-bottom: 4px; }
+  .gl-state {
+    flex: 1;
+    padding: 6px 0;
+    border: 1px solid var(--border);
+    background: var(--field);
+    border-radius: 8px;
+    font-size: 0.8rem;
+    color: var(--text);
+  }
+  .gl-state.on { color: #fff; }
+  .gl-state.on.s0 { background: #8a8a8a; border-color: #8a8a8a; }
+  .gl-state.on.s1 { background: #c48a2c; border-color: #c48a2c; }
+  .gl-state.on.s2 { background: #2e7d5b; border-color: #2e7d5b; }
+  .gl-state.on.s3 { background: #a5473b; border-color: #a5473b; }
+  .gl-del { flex: none; color: var(--muted); }
   .status-line { text-align: center; padding: 10px; font-size: 0.9rem; color: var(--muted); min-height: 1.4em; }
 
   .close-settings {
@@ -342,15 +362,6 @@
         <div id="beingText"></div>
       </div>
       <button class="small-btn" id="beingEditBtn" aria-label="ありたい姿を書く">✏️</button>
-    </div>
-    <div id="beingForm" style="display:none;">
-      <div class="being-label">ありたい姿</div>
-      <textarea id="beingEdit" placeholder="5年後、どこで・誰と・どのように働き、何を大切に暮らしているか"></textarea>
-      <div style="display:flex; gap:8px; margin-top:8px;">
-        <button class="reroll" id="beingSaveBtn">保存</button>
-        <button class="reroll" id="beingCancelBtn">やめる</button>
-      </div>
-      <p class="hint" style="margin:8px 0 0;">今はこのスマホの中だけに保存します(目標タブができたら、そちらへ移します)</p>
     </div>
     <div class="policy">
       <div class="being-label">今日の行動方針(規格外さん)</div>
@@ -493,8 +504,50 @@
       <div id="rvFeedback"></div>
     </div>
   </section>
+  <!-- ③ 目標タブ(ありたい姿・年・月) -->
   <section class="tab-panel" id="tab-goal">
-    <div class="card coming">目標タブは準備中です。<br>(ありたい姿・年と月の目標)</div>
+    <div class="card">
+      <label class="field-label">ありたい姿(5年後)</label>
+      <textarea id="glBeing" placeholder="5年後、どこで・誰と・どのように働き、何を大切に暮らしているか"></textarea>
+      <p class="hint" id="glBeingUpdated" style="margin:6px 0 0;"></p>
+      <label class="field-label rv-sub">なぜそうなりたいか(借り物の目標にしないため、3回掘る)</label>
+      <input type="text" id="glWhy1" placeholder="なぜ？ 1回目">
+      <input type="text" id="glWhy2" placeholder="それはなぜ？ 2回目">
+      <input type="text" id="glWhy3" placeholder="さらになぜ？ 3回目" style="margin-bottom:0;">
+    </div>
+
+    <div class="card">
+      <div class="seg" style="margin-bottom:8px;">
+        <button class="seg-btn" id="glThisYearBtn">今年</button>
+        <button class="seg-btn" id="glNextYearBtn">来年</button>
+      </div>
+      <div id="glYearLabel" class="rv-week" style="margin:0 0 8px;"></div>
+      <label class="field-label">年の目標(1行に1つ)</label>
+      <textarea id="glYearGoals" placeholder="例: 容器台帳をAccessに移しきる"></textarea>
+      <label class="field-label rv-sub">この年に捨てるもの(得るために捨てる)</label>
+      <textarea id="glYearDiscard" style="min-height:60px;" placeholder="例: 夜のだらだらスマホ"></textarea>
+    </div>
+
+    <div class="card">
+      <div class="seg" style="margin-bottom:8px;">
+        <button class="seg-btn" id="glPrevMonthBtn">先月</button>
+        <button class="seg-btn" id="glThisMonthBtn">今月</button>
+        <button class="seg-btn" id="glNextMonthBtn">来月</button>
+      </div>
+      <div id="glMonthLabel" class="rv-week" style="margin:0;"></div>
+      <p class="hint" id="glMonthYearRef" style="margin:6px 0 10px;"></p>
+      <label class="field-label">月の目標と進み具合 <span id="glMonthSummary" class="snippet"></span></label>
+      <div id="glMonthGoals"></div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <button class="reroll" id="glAddGoalBtn">＋ 目標を足す</button>
+        <button class="reroll" id="glCarryBtn" style="display:none;"></button>
+      </div>
+      <label class="field-label rv-sub">月末のふり返り(できた理由・できなかった理由、次の月へ)</label>
+      <textarea id="glMonthMemo" style="min-height:70px;"></textarea>
+    </div>
+
+    <button class="save-btn" id="glSaveBtn">目標を保存</button>
+    <div id="glStatus" class="status-line"></div>
   </section>
   <section class="tab-panel" id="tab-analysis">
     <div class="card coming">分析タブは準備中です。<br>(伸ばす/維持/捨てる/今ではない、ギャップ分析)</div>
@@ -560,5 +613,6 @@
 <script src="jma-weather.js"></script>
 <script src="app.js"></script>
 <script src="review.js"></script>
+<script src="goal.js"></script>
 </body>
 </html>

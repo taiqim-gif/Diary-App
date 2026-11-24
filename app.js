@@ -1143,8 +1143,9 @@ applyTheme(currentTheme());
 const WAFU_MONTHS = ["睦月", "如月", "弥生", "卯月", "皐月", "水無月", "文月", "葉月", "長月", "神無月", "霜月", "師走"];
 function renderHeadDate() {
   const d = new Date();
-  document.getElementById("headDate").textContent =
-    `${d.getMonth() + 1}月[${WAFU_MONTHS[d.getMonth()]}]`; // 幅が足りないので年は出さない
+  // 「11月」と「[霜月]」を分けておき、入りきらないときは [霜月] だけ次の行に出す
+  document.getElementById("headDate").innerHTML =
+    `<span>${d.getMonth() + 1}月</span><span>[${WAFU_MONTHS[d.getMonth()]}]</span>`; // 幅が足りないので年は出さない
 }
 renderHeadDate();
 

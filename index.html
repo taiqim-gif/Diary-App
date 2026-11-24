@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
@@ -288,6 +288,17 @@
     color: var(--text);
     font-family: inherit;
   }
+  /* 日時の欄がカードからはみ出さないように(スマホの日時欄は、幅の指定を無視しやすい) */
+  input[type=datetime-local] {
+    display: block;
+    max-width: 100%;
+    min-width: 0;
+    -webkit-appearance: none;
+    appearance: none;
+    min-height: 2.6em;
+    text-align: left;
+  }
+  input[type=datetime-local]::-webkit-date-and-time-value { text-align: left; }
   .condition-row { display: flex; gap: 12px; }
   .condition-col { flex: 1; min-width: 0; }
   select, input[type=number] {
@@ -817,11 +828,11 @@
   </div>
 </div>
 
-<script src="questions.js?v=20261125d"></script>
-<script src="jma-weather.js?v=20261125d"></script>
-<script src="app.js?v=20261125d"></script>
-<script src="review.js?v=20261125d"></script>
-<script src="goal.js?v=20261125d"></script>
-<script src="analysis.js?v=20261125d"></script>
+<script src="questions.js?v=20261125e"></script>
+<script src="jma-weather.js?v=20261125e"></script>
+<script src="app.js?v=20261125e"></script>
+<script src="review.js?v=20261125e"></script>
+<script src="goal.js?v=20261125e"></script>
+<script src="analysis.js?v=20261125e"></script>
 </body>
 </html>

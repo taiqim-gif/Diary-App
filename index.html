@@ -76,6 +76,12 @@
   :root[data-theme="season"] { --radius: 10px; }
 
   * { box-sizing: border-box; }
+  /* 文字全体の大きさ(rem で書いた文字は、すべてこれを基準に大きくなる。標準は16px) */
+  html { font-size: 18px; -webkit-text-size-adjust: 100%; }
+  /* 天気の詳しい画面も大きく */
+  body .jw-sheet { font-size: 16px; }
+  body .jw-tbl { font-size: 15px; }
+  body .jw-sub, body .jw-note, body .jw-moon .jw-np { font-size: 13.5px; }
   body {
     margin: 0;
     font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;

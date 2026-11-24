@@ -1072,7 +1072,7 @@ const WAFU_MONTHS = ["睦月", "如月", "弥生", "卯月", "皐月", "水無�
 function renderHeadDate() {
   const d = new Date();
   document.getElementById("headDate").textContent =
-    `${d.getFullYear()}年${d.getMonth() + 1}月(${WAFU_MONTHS[d.getMonth()]})`;
+    `${d.getMonth() + 1}月(${WAFU_MONTHS[d.getMonth()]})`; // 幅が足りないので年は出さない
 }
 renderHeadDate();
 

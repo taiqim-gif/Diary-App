@@ -13,58 +13,58 @@
   /* 見た目(テーマ)。設定画面で切り替え、<html data-theme="..."> で色を差し替える */
   /* 標準・藍ブルー(いつもの見た目) */
   :root {
-    --bg: #f4f6f9;
+    --bg: #d9e3f2;
     --card: #ffffff;
-    --accent: #2b4c8c;
-    --accent-soft: #e5ebf6;
+    --accent: #1f3f80;
+    --accent-soft: #cddaf0;
     --on-accent: #ffffff;
-    --text: #22262e;
-    --muted: #7d8592;
-    --border: #dfe4ec;
-    --field: #fbfcfd;
-    --readonly: #eef1f5;
+    --text: #141820;
+    --muted: #5b6474;
+    --border: #b9c7de;
+    --field: #f7f9fc;
+    --readonly: #e3e9f2;
     --good: #2e7d5b;
     --bad: #a5473b;
     --radius: 14px;
-    --shadow: 0 1px 3px rgba(0,0,0,0.06);
+    --shadow: 0 2px 6px rgba(20,40,80,0.12);
     --head-font: inherit;
     color-scheme: light;
   }
   /* 標準・グリーン */
   :root[data-theme="green"] {
-    --bg: #f3f7f4;
-    --accent: #2e6b4f;
-    --accent-soft: #e2efe7;
-    --border: #dce7df;
-    --readonly: #edf2ee;
+    --bg: #d5e8db;
+    --accent: #1e5c3f;
+    --accent-soft: #c6e0cf;
+    --border: #a9cdb5;
+    --readonly: #e0eee4;
   }
   /* 和風: 生成りの紙に、藍・朱・抹茶 */
   :root[data-theme="wa"] {
-    --bg: #f2ecdf;
-    --card: #fbf8f1;
-    --accent: #264e70;
-    --accent-soft: #e4e8e6;
-    --text: #2b2620;
-    --muted: #8a7f6e;
-    --border: #ddd3c0;
+    --bg: #e3d5b8;
+    --card: #fbf7ee;
+    --accent: #1d4466;
+    --accent-soft: #d8dfe3;
+    --text: #231e18;
+    --muted: #6e6352;
+    --border: #c9b896;
     --field: #fffdf8;
     --readonly: #efe9dc;
-    --good: #5b7a3a;
-    --bad: #c0462b;
+    --good: #4d6e2c;
+    --bad: #b8381d;
     --radius: 6px;
     --shadow: none;
     --head-font: "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif;
   }
   /* 夜: 黒に近い紺に、月のような淡い金 */
   :root[data-theme="night"] {
-    --bg: #0e1524;
-    --card: #172138;
-    --accent: #d9b86a;
-    --accent-soft: #252f48;
+    --bg: #070c18;
+    --card: #18244a;
+    --accent: #f0c860;
+    --accent-soft: #2a3a66;
     --on-accent: #1a1d26;
-    --text: #e4e7ee;
-    --muted: #8f98ad;
-    --border: #2a3552;
+    --text: #f2f4f8;
+    --muted: #a3adc4;
+    --border: #34447a;
     --field: #111a2d;
     --readonly: #1c2640;
     --good: #5fae8a;
@@ -87,7 +87,7 @@
   h1, .rv-week, .modal-header strong { font-family: var(--head-font); }
   /* 天気の部品の色も、テーマに合わせる */
   #wxHere .jw-r2 { color: var(--accent); }
-  :root[data-theme="night"] #wxHere .jw-r1 { color: #7fd3cf; }
+  :root[data-theme="night"] #wxHere .jw-r1 { color: #8ce6e0; }
   :root[data-theme="night"] .jw-sheet { background: var(--card); color: var(--text); border-top-color: var(--border); }
   :root[data-theme="night"] .jw-tbl th, :root[data-theme="night"] .jw-tbl td { border-color: var(--border); }
   :root[data-theme="night"] .jw-tbl thead th { background: var(--accent-soft); color: var(--accent); }

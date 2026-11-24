@@ -1073,18 +1073,18 @@ on("actBadBtn", "click", () => setAct("動けなかった"));
 const THEME_KEY = "sdlTheme";
 // 季節で自動のときの、月ごとの色 [名前, 濃い色, 薄い色, 地の色]
 const SEASON_COLORS = [
-  ["松の緑", "#2f5d50", "#e3ece8", "#f5f6f1"], // 1月 睦月
-  ["梅", "#a8395a", "#f5e4ea", "#fbf5f6"], // 2月 如月
-  ["桃", "#c0587e", "#f8e5ed", "#fdf5f8"], // 3月 弥生
-  ["桜", "#b5607a", "#f6e6eb", "#fdf7f8"], // 4月 卯月
-  ["新緑", "#4f7d3a", "#e6efdf", "#f5f8f0"], // 5月 皐月
-  ["紫陽花", "#5a5fa8", "#e6e7f4", "#f5f5fa"], // 6月 水無月
-  ["夏の海", "#1f6aa5", "#e0edf7", "#f2f7fb"], // 7月 文月
-  ["向日葵", "#b0730e", "#f6ecd8", "#fdf9f0"], // 8月 葉月
-  ["桔梗", "#6b5aa6", "#ebe7f4", "#f7f5fa"], // 9月 長月
-  ["柿", "#c0602a", "#f6e5da", "#fcf6f1"], // 10月 神無月
-  ["枯葉", "#8a5a2b", "#f0e6da", "#f8f3ec"], // 11月 霜月
-  ["雪と紺", "#2d4a7a", "#e3e9f2", "#f3f6fa"], // 12月 師走
+  ["松の緑", "#24503f", "#cfe1d8", "#dce8e1"], // 1月 睦月
+  ["梅", "#962c4c", "#efd0db", "#f3dde5"], // 2月 如月
+  ["桃", "#b0456c", "#f3d3e0", "#f7e0ea"], // 3月 弥生
+  ["桜", "#a64d68", "#f0d5de", "#f6e3e9"], // 4月 卯月
+  ["新緑", "#3f6d2b", "#d3e5c6", "#e0edd5"], // 5月 皐月
+  ["紫陽花", "#474d9c", "#d2d5ee", "#dfe1f3"], // 6月 水無月
+  ["夏の海", "#135a94", "#c9e0f2", "#d8e9f6"], // 7月 文月
+  ["向日葵", "#9a6206", "#f2dfb6", "#f7e9c9"], // 8月 葉月
+  ["桔梗", "#594796", "#dbd4ef", "#e6e0f4"], // 9月 長月
+  ["柿", "#ab4e1b", "#f1d4c2", "#f6e1d3"], // 10月 神無月
+  ["枯葉", "#784a1f", "#e6d3bd", "#eddfcd"], // 11月 霜月
+  ["雪と紺", "#203c6c", "#cfdbec", "#dde6f2"], // 12月 師走
 ];
 function seasonColor() {
   return SEASON_COLORS[new Date().getMonth()];
@@ -1139,12 +1139,12 @@ function renderThemeList() {
 
 applyTheme(currentTheme());
 
-// タイトルの下に「2026年11月(霜月)」(西暦の年月と、和風月名)
+// タイトルの下に「11月[霜月]」(西暦の年月と、和風月名)
 const WAFU_MONTHS = ["睦月", "如月", "弥生", "卯月", "皐月", "水無月", "文月", "葉月", "長月", "神無月", "霜月", "師走"];
 function renderHeadDate() {
   const d = new Date();
   document.getElementById("headDate").textContent =
-    `${d.getMonth() + 1}月(${WAFU_MONTHS[d.getMonth()]})`; // 幅が足りないので年は出さない
+    `${d.getMonth() + 1}月[${WAFU_MONTHS[d.getMonth()]}]`; // 幅が足りないので年は出さない
 }
 renderHeadDate();
 

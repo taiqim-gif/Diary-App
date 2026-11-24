@@ -10,9 +10,11 @@
     --bg: #f7f5f2;
     --card: #ffffff;
     --accent: #4a4a8a;
+    --accent-soft: #ecebf7;
     --text: #2b2b2b;
     --muted: #8a8a8a;
     --border: #e3e0da;
+    --field: #fcfcfb;
   }
   * { box-sizing: border-box; }
   body {
@@ -23,17 +25,19 @@
     padding: env(safe-area-inset-top) 16px env(safe-area-inset-bottom);
   }
   header {
-    padding: 20px 0 12px;
+    padding: 16px 0 10px;
     display: flex;
-    justify-content: space-between;
     align-items: center;
+    gap: 8px;
   }
-  h1 { font-size: 1.2rem; margin: 0; }
+  h1 { font-size: 1.2rem; margin: 0; flex: 1; white-space: nowrap; }
+  #wxHere { min-width: 0; }
   .gear {
     font-size: 1.4rem;
     background: none;
     border: none;
     cursor: pointer;
+    padding: 4px;
   }
   .card {
     background: var(--card);
@@ -43,20 +47,66 @@
     box-shadow: 0 1px 3px rgba(0,0,0,0.06);
     border: 1px solid var(--border);
   }
+
+  /* ありたい姿と今日の行動方針 */
+  .being-card { padding: 12px 14px; }
+  .being-row { display: flex; gap: 8px; align-items: flex-start; }
+  .being-label {
+    font-size: 0.72rem;
+    color: var(--accent);
+    font-weight: 600;
+    margin-bottom: 2px;
+  }
+  #beingText { font-size: 0.9rem; line-height: 1.5; white-space: pre-wrap; }
+  #beingText.empty { color: var(--muted); }
+  .small-btn {
+    background: none;
+    border: none;
+    font-size: 1rem;
+    padding: 2px 4px;
+    color: var(--accent);
+  }
+  .policy {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px dashed var(--border);
+    font-size: 0.85rem;
+    line-height: 1.5;
+  }
+
+  /* タブ */
+  .tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 14px;
+    background: var(--accent-soft);
+    border-radius: 12px;
+    padding: 4px;
+  }
+  .tab-btn {
+    flex: 1;
+    border: none;
+    background: none;
+    padding: 9px 0;
+    border-radius: 9px;
+    font-size: 0.9rem;
+    color: var(--accent);
+  }
+  .tab-btn.active { background: var(--card); font-weight: 700; box-shadow: 0 1px 2px rgba(0,0,0,0.08); }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+  .coming { text-align: center; color: var(--muted); padding: 30px 10px; line-height: 1.7; }
+
   .cat-label {
     display: inline-block;
     font-size: 0.75rem;
     color: var(--accent);
-    background: #ecebf7;
+    background: var(--accent-soft);
     padding: 3px 10px;
     border-radius: 999px;
     margin-bottom: 8px;
   }
-  .question-text {
-    font-size: 1.05rem;
-    line-height: 1.6;
-    margin: 0 0 12px;
-  }
+  .question-text { font-size: 1rem; line-height: 1.6; margin: 0 0 10px; }
   button.reroll {
     background: none;
     border: 1px solid var(--accent);
@@ -74,8 +124,10 @@
     font-size: 1rem;
     font-family: inherit;
     resize: vertical;
-    background: #fcfcfb;
+    background: var(--field);
+    color: var(--text);
   }
+  #bodyInput { min-height: 180px; }
   label.field-label {
     display: block;
     font-size: 0.85rem;
@@ -101,36 +153,35 @@
     color: var(--muted);
     min-height: 1.4em;
   }
-  #settings-panel {
-    display: none;
-  }
+  #settings-panel { display: none; }
   #settings-panel.open { display: block; }
   #main-panel.hidden { display: none; }
-  input[type=text], input[type=password] {
+  input[type=text], input[type=password], input[type=search], input[type=datetime-local] {
     width: 100%;
     padding: 10px;
     border: 1px solid var(--border);
     border-radius: 8px;
     font-size: 1rem;
     margin-bottom: 10px;
+    background: var(--field);
+    color: var(--text);
+    font-family: inherit;
   }
-  .condition-row {
-    display: flex;
-    gap: 12px;
-  }
-  .condition-col { flex: 1; }
+  .condition-row { display: flex; gap: 12px; }
+  .condition-col { flex: 1; min-width: 0; }
   select, input[type=number] {
     width: 100%;
     padding: 10px;
     border: 1px solid var(--border);
     border-radius: 8px;
     font-size: 1rem;
-    background: #fcfcfb;
+    background: var(--field);
+    color: var(--text);
   }
   .add-question-btn {
     width: 100%;
     padding: 12px;
-    background: #ecebf7;
+    background: var(--accent-soft);
     color: var(--accent);
     border: 1px dashed var(--accent);
     border-radius: 12px;
@@ -138,6 +189,12 @@
     font-weight: 600;
     margin-bottom: 16px;
   }
+  .search-row { display: flex; gap: 8px; }
+  .search-row input { margin-bottom: 0; }
+  .search-row button { flex: none; }
+  #searchResults { margin-top: 10px; }
+  .snippet { font-size: 0.82rem; color: var(--muted); }
+  #lookbackBody { font-size: 0.9rem; line-height: 1.6; white-space: pre-wrap; margin: 6px 0 8px; }
   .modal-overlay {
     display: none;
     position: fixed;
@@ -164,31 +221,13 @@
   .browse-q-item {
     width: 100%;
     text-align: left;
-    background: #fcfcfb;
+    background: var(--field);
     border: 1px solid var(--border);
     border-radius: 8px;
     padding: 10px;
     margin-bottom: 6px;
     font-size: 0.92rem;
-  }
-  .tag-picker {
-    margin-top: 10px;
-    flex-wrap: wrap;
-    gap: 6px;
-  }
-  .tag-picker.open { display: flex !important; }
-  .tag-pill {
-    padding: 6px 12px;
-    border-radius: 999px;
-    border: 1px solid var(--border);
-    background: #fcfcfb;
-    font-size: 0.8rem;
     color: var(--text);
-  }
-  .tag-pill.selected {
-    background: var(--accent);
-    color: white;
-    border-color: var(--accent);
   }
   .modal-header {
     position: sticky;
@@ -211,9 +250,6 @@
     border-radius: 50%;
     line-height: 1;
   }
-  .cat-label-clickable {
-    cursor: pointer;
-  }
   .hint {
     font-size: 0.78rem;
     color: var(--muted);
@@ -234,42 +270,117 @@
 
 <header>
   <h1>私の日記</h1>
-  <button class="gear" id="gearBtn">⚙️</button>
+  <span id="wxHere"></span>
+  <button class="gear" id="gearBtn" aria-label="設定">⚙️</button>
 </header>
 
 <div id="main-panel">
-  <div class="card">
-    <label class="field-label">今日のコンディション</label>
-    <div class="condition-row">
-      <div class="condition-col">
-        <label class="field-label">体調</label>
-        <select id="conditionSelect">
-          <option value="">選択しない</option>
-          <option value="絶好調">絶好調</option>
-          <option value="良い">良い</option>
-          <option value="普通">普通</option>
-          <option value="やや不調">やや不調</option>
-          <option value="不調">不調</option>
-        </select>
+  <!-- ありたい姿と、規格外さんの今日の行動方針(いつも上に出す) -->
+  <div class="card being-card">
+    <div id="beingView" class="being-row">
+      <div style="flex:1;">
+        <div class="being-label">ありたい姿</div>
+        <div id="beingText"></div>
       </div>
-      <div class="condition-col">
-        <label class="field-label">睡眠時間(h)</label>
-        <input type="number" id="sleepInput" step="0.5" min="0" max="24" placeholder="例: 6.5">
+      <button class="small-btn" id="beingEditBtn" aria-label="ありたい姿を書く">✏️</button>
+    </div>
+    <div id="beingForm" style="display:none;">
+      <div class="being-label">ありたい姿</div>
+      <textarea id="beingEdit" placeholder="5年後、どこで・誰と・どのように働き、何を大切に暮らしているか"></textarea>
+      <div style="display:flex; gap:8px; margin-top:8px;">
+        <button class="reroll" id="beingSaveBtn">保存</button>
+        <button class="reroll" id="beingCancelBtn">やめる</button>
       </div>
+      <p class="hint" style="margin:8px 0 0;">今はこのスマホの中だけに保存します(目標タブができたら、そちらへ移します)</p>
+    </div>
+    <div class="policy">
+      <div class="being-label">今日の行動方針(規格外さん)</div>
+      <div id="policyText"></div>
     </div>
   </div>
 
-  <div class="card">
-    <label class="field-label">自由記述(任意)</label>
-    <textarea id="freeText" placeholder="今日あったことを自由に"></textarea>
-    <button class="reroll" id="tagToggleBtn" style="margin-top:8px;">🏷️ タグ付け</button>
-    <div id="tagPicker" class="tag-picker" style="display:none;"></div>
-  </div>
+  <nav class="tabs">
+    <button class="tab-btn" data-tab="diary">日記</button>
+    <button class="tab-btn" data-tab="review">振り返り</button>
+    <button class="tab-btn" data-tab="goal">目標</button>
+    <button class="tab-btn" data-tab="analysis">分析</button>
+  </nav>
 
-  <div id="questionCards"></div>
-  <div style="display:flex; gap:10px; margin-bottom:16px;">
-    <button class="add-question-btn" id="browseQuestionsBtn" style="flex:1;">📋 質問一覧から選ぶ</button>
-  </div>
+  <!-- ① 日記タブ -->
+  <section class="tab-panel" id="tab-diary">
+    <div class="card">
+      <label class="field-label">日時</label>
+      <input type="datetime-local" id="whenInput">
+      <label class="field-label">タイトル</label>
+      <input type="text" id="titleInput" placeholder="今日をひとことで">
+      <label class="field-label">本文(自由に)</label>
+      <textarea id="bodyInput" placeholder="今日あったこと・感じたこと・考えたこと"></textarea>
+    </div>
+
+    <div class="card">
+      <span class="cat-label" id="hintCat"></span>
+      <p class="question-text" id="hintText"></p>
+      <textarea id="hintAnswer" placeholder="答えは書かなくてもよい(書くと本文と一緒に残ります)" style="min-height:70px;"></textarea>
+      <div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap;">
+        <button class="reroll" id="hintNextBtn">🔄 別の質問</button>
+        <button class="reroll" id="browseQuestionsBtn">📋 一覧から選ぶ</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <label class="field-label">試すこと(1行。人に試して、結果を次の日記に書く)</label>
+      <input type="text" id="trialInput" placeholder="例: 話を最後まで聞いてから答える" style="margin-bottom:12px;">
+      <div class="condition-row">
+        <div class="condition-col">
+          <label class="field-label">体調</label>
+          <select id="conditionSelect">
+            <option value="">選択しない</option>
+            <option value="絶好調">絶好調</option>
+            <option value="良い">良い</option>
+            <option value="普通">普通</option>
+            <option value="やや不調">やや不調</option>
+            <option value="不調">不調</option>
+          </select>
+        </div>
+        <div class="condition-col">
+          <label class="field-label">睡眠時間(h)</label>
+          <input type="number" id="sleepInput" step="0.5" min="0" max="24" placeholder="例: 6.5">
+        </div>
+      </div>
+      <p class="hint" style="margin:10px 0 0;">保存すると、天気・気温・月齢も一緒に残ります</p>
+    </div>
+
+    <button class="save-btn" id="saveBtn">保存</button>
+    <div id="status"></div>
+
+    <div class="card">
+      <label class="field-label">1年前の今日(<span id="lookbackDate"></span>)</label>
+      <div id="lookbackBody"></div>
+      <button class="reroll" id="lookbackOpenBtn" style="display:none;">全部読む</button>
+    </div>
+
+    <div class="card">
+      <label class="field-label">過去の日記を検索(タイトルも本文も)</label>
+      <div class="search-row">
+        <input type="search" id="searchInput" placeholder="言葉を入れる(空白で区切ると両方を含む日)">
+        <button class="reroll" id="searchBtn">検索</button>
+      </div>
+      <div id="searchResults"></div>
+    </div>
+
+    <button class="add-question-btn" id="viewPastBtn">📖 日付から過去の日記を見る</button>
+  </section>
+
+  <!-- ②〜④ はあとで作る -->
+  <section class="tab-panel" id="tab-review">
+    <div class="card coming">振り返りタブは準備中です。<br>(週1回の振り返り・Claudeのチェックを読む)</div>
+  </section>
+  <section class="tab-panel" id="tab-goal">
+    <div class="card coming">目標タブは準備中です。<br>(ありたい姿・年と月の目標)</div>
+  </section>
+  <section class="tab-panel" id="tab-analysis">
+    <div class="card coming">分析タブは準備中です。<br>(伸ばす/維持/捨てる/今ではない、ギャップ分析)</div>
+  </section>
 
   <div id="browse-modal" class="modal-overlay">
     <div class="modal-box">
@@ -281,11 +392,6 @@
     </div>
   </div>
 
-  <button class="save-btn" id="saveBtn">今日のノートに保存</button>
-  <div id="status"></div>
-
-  <button class="add-question-btn" id="viewPastBtn" style="margin-top:10px;">📖 過去の日記を見る</button>
-
   <div id="view-modal" class="modal-overlay">
     <div class="modal-box">
       <div class="modal-header">
@@ -293,7 +399,7 @@
         <button id="closeViewBtn" class="modal-close-btn">✕</button>
       </div>
       <div id="viewDateList"></div>
-      <pre id="viewContent" style="white-space:pre-wrap; font-size:0.9rem; display:none;"></pre>
+      <pre id="viewContent" style="white-space:pre-wrap; font-size:0.9rem; display:none; font-family:inherit;"></pre>
       <textarea id="viewEditArea" style="display:none; min-height:50vh;"></textarea>
       <div id="viewActions" style="display:none; gap:8px; margin-top:10px;">
         <button class="reroll" id="editEntryBtn">✏️ この日を編集</button>
@@ -312,19 +418,18 @@
     <label class="field-label">リポジトリオーナー</label>
     <input type="text" id="ownerInput" placeholder="taiqim-gif">
     <label class="field-label">リポジトリ名</label>
-    <input type="text" id="repoInput" placeholder="obsidian-sync">
+    <input type="text" id="repoInput" placeholder="self-diary-loop">
     <label class="field-label">ブランチ</label>
     <input type="text" id="branchInput" placeholder="main">
     <label class="field-label">日記ファイルのパス(1ファイルにまとめて保存)</label>
-    <input type="text" id="pathInput" placeholder="01_Daily/日記.md">
-    <button class="add-question-btn" id="migrateBtn" style="margin-top:4px;">日付別ファイルを日記.mdに統合(1回だけ)</button>
-    <p class="hint" id="migrateStatus"></p>
+    <input type="text" id="pathInput" placeholder="diary/日記.md">
     <p class="hint">Fine-grained PATは対象リポジトリのContentsをRead and writeに設定して発行してください。この情報はこの端末のブラウザ内にのみ保存されます。</p>
     <button class="close-settings" id="saveSettingsBtn">保存して閉じる</button>
   </div>
 </div>
 
 <script src="questions.js"></script>
+<script src="jma-weather.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

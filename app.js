@@ -1,5 +1,8 @@
-// 規格外さん日記 - アプリ本体
+// 日記×自己分析 - アプリ本体
+// ①日記タブ(天気・月齢つき)。振り返り・目標・分析タブはあとで作る
 const SETTINGS_KEY = "shinkaronDiarySettings";
+const BEING_KEY = "sdlBeing"; // ありたい姿(目標タブができるまで、この端末に保存)
+const DRAFT_KEY = "sdlDraft"; // 書きかけの日記(この端末だけ)
 
 const CATEGORY_ORDER = [
   "1. 基本の振り返り",
@@ -9,23 +12,48 @@ const CATEGORY_ORDER = [
   "5. コミットメント",
 ];
 
-let questionCards = []; // { id, question: {cat, text}, answer }
-let selectedFreeTags = [];
-let cardSeq = 0;
+// 規格外さんの行動方針(Xの本人の投稿 2026-11-07～11-24 の68件から抜き出した10個)
+const POLICIES = [
+  "未来の自分に贈り物をする(波及効果の高いものから)",
+  "小さく攻める(土台は守る)",
+  "すぐに見返りを求めない",
+  "くり返すことは仕組みにする・小さな作業を用意する",
+  "失敗は、次に変える点だけを読み取る",
+  "借り物の目標を持たない",
+  "相手に誠実に(断りやすい頼み方・返事をする・褒める・けなさない)",
+  "知っているより、やっている",
+  "お金と正面から向き合う",
+  "言葉にして残す",
+];
+
+let hint = null; // 今出している書き始めのヒント { cat, text }
+let viewCache = null; // GitHubから読んだ日記ファイル { content }
+let currentViewDate = null;
+let wx = null; // 天気の部品
+let timeTouched = false; // 日時を手で変えたか
 
 // ---------- ユーティリティ ----------
 
+function pad2(n) {
+  return String(n).padStart(2, "0");
+}
+
+function dateKey(d) {
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+}
+
 function todayStr() {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+  return dateKey(new Date());
 }
 
 function timeStr() {
   const d = new Date();
-  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+}
+
+// datetime-local の入力欄に入れる形(2026-11-24T21:30)
+function localDateTimeValue(d) {
+  return `${dateKey(d)}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
 }
 
 function b64EncodeUnicode(str) {
@@ -41,28 +69,60 @@ function b64DecodeUnicode(b64) {
   return new TextDecoder("utf-8").decode(bytes);
 }
 
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
 function setStatus(msg) {
   document.getElementById("status").textContent = msg;
 }
 
-function randomQuestion() {
-  return QUESTIONS[Math.floor(Math.random() * QUESTIONS.length)];
+// 端末への保存(使えないときも止まらないように)
+function lsGet(key) {
+  try {
+    return localStorage.getItem(key);
+  } catch (e) {
+    return null;
+  }
 }
 
-function randomQuestionInCategory(cat) {
-  const list = QUESTIONS.filter((q) => q.cat === cat);
-  return list[Math.floor(Math.random() * list.length)];
+function lsSet(key, value) {
+  try {
+    localStorage.setItem(key, value);
+  } catch (e) {
+    /* 保存できなくても続ける */
+  }
+}
+
+function lsRemove(key) {
+  try {
+    localStorage.removeItem(key);
+  } catch (e) {
+    /* 何もしない */
+  }
 }
 
 // ---------- 設定 ----------
 
 function loadSettings() {
-  const raw = localStorage.getItem(SETTINGS_KEY);
-  return raw ? JSON.parse(raw) : null;
+  const raw = lsGet(SETTINGS_KEY);
+  try {
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) {
+    return null;
+  }
 }
 
 function saveSettingsToStorage(s) {
-  localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
+  lsSet(SETTINGS_KEY, JSON.stringify(s));
+}
+
+function hasSettings(s) {
+  return !!(s && s.pat && s.owner && s.repo);
 }
 
 function openSettings() {
@@ -82,130 +142,228 @@ function settingsFromForm() {
     owner: document.getElementById("ownerInput").value.trim(),
     repo: document.getElementById("repoInput").value.trim(),
     branch: document.getElementById("branchInput").value.trim() || "main",
-    path: document.getElementById("pathInput").value.trim() || "01_Daily/日記.md",
+    path: document.getElementById("pathInput").value.trim() || "diary/日記.md",
   };
 }
 
 function closeSettings() {
-  const s = settingsFromForm();
-  saveSettingsToStorage(s);
+  saveSettingsToStorage(settingsFromForm());
   document.getElementById("settings-panel").classList.remove("open");
   document.getElementById("main-panel").classList.remove("hidden");
+  viewCache = null;
+  loadLookback();
 }
 
-// ---------- 質問カードUI ----------
+// ---------- タブ ----------
 
-function addQuestionCard(cat) {
-  const id = ++cardSeq;
-  const question = randomQuestionInCategory(cat);
-  questionCards.push({ id, question, answer: "" });
-  renderQuestionCards();
-}
-
-function initDefaultCards() {
-  questionCards = [];
-  const cat = CATEGORY_ORDER[Math.floor(Math.random() * CATEGORY_ORDER.length)];
-  const id = ++cardSeq;
-  questionCards.push({ id, question: randomQuestionInCategory(cat), answer: "" });
-  renderQuestionCards();
-}
-
-function removeQuestionCard(id) {
-  if (questionCards.length <= 1) return;
-  questionCards = questionCards.filter((c) => c.id !== id);
-  renderQuestionCards();
-}
-
-function escapeHtml(str) {
-  return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-}
-
-function renderQuestionCards() {
-  const container = document.getElementById("questionCards");
-  container.innerHTML = "";
-  questionCards.forEach((c) => {
-    const card = document.createElement("div");
-    card.className = "card";
-    const deleteBtnHtml =
-      questionCards.length > 1
-        ? `<button class="reroll remove-card" data-card-id="${c.id}">✕ 削除</button>`
-        : "";
-    card.innerHTML = `
-      <span class="cat-label cat-label-clickable" data-card-id="${c.id}">${c.question.cat} 🔀</span>
-      <p class="question-text">${c.question.text}</p>
-      <textarea data-card-id="${c.id}" class="answer-input" placeholder="ここに書く">${escapeHtml(c.answer || "")}</textarea>
-      <div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap;">
-        <button class="reroll reroll-single" data-card-id="${c.id}">🔄 この項目で別の質問</button>
-        <button class="reroll add-single" data-cat="${c.question.cat}">＋ この項目に追加</button>
-        ${deleteBtnHtml}
-      </div>
-    `;
-    container.appendChild(card);
+function showTab(name) {
+  document.querySelectorAll(".tab-btn").forEach((b) => {
+    b.classList.toggle("active", b.dataset.tab === name);
   });
+  document.querySelectorAll(".tab-panel").forEach((p) => {
+    p.classList.toggle("active", p.id === "tab-" + name);
+  });
+}
 
-  container.querySelectorAll(".cat-label-clickable").forEach((el) => {
-    el.addEventListener("click", () => {
-      const id = Number(el.dataset.cardId);
-      const card = questionCards.find((c) => c.id === id);
-      if (card) {
-        const others = CATEGORY_ORDER.filter((c2) => c2 !== card.question.cat);
-        const newCat = others[Math.floor(Math.random() * others.length)];
-        card.question = randomQuestionInCategory(newCat);
-        card.answer = "";
-        renderQuestionCards();
+// ---------- ありたい姿と今日の行動方針 ----------
+
+function renderBeing() {
+  const text = lsGet(BEING_KEY) || "";
+  const el = document.getElementById("beingText");
+  el.textContent = text || "(まだありません。✏️ を押して書く)";
+  el.classList.toggle("empty", !text);
+}
+
+function startEditBeing() {
+  document.getElementById("beingEdit").value = lsGet(BEING_KEY) || "";
+  document.getElementById("beingView").style.display = "none";
+  document.getElementById("beingForm").style.display = "block";
+}
+
+function saveBeing() {
+  lsSet(BEING_KEY, document.getElementById("beingEdit").value.trim());
+  document.getElementById("beingForm").style.display = "none";
+  document.getElementById("beingView").style.display = "flex";
+  renderBeing();
+}
+
+function cancelBeing() {
+  document.getElementById("beingForm").style.display = "none";
+  document.getElementById("beingView").style.display = "flex";
+}
+
+// 日付で決まるので、同じ日は同じ方針が出る
+function todayPolicy() {
+  const d = new Date();
+  const dayNo = Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 86400000);
+  return POLICIES[dayNo % POLICIES.length];
+}
+
+// ---------- 書き始めのヒント(質問を1つ) ----------
+
+// 「基本の振り返り」を半分の確率で、残りはほかの4項目から出す
+function pickHint() {
+  const basic = QUESTIONS.filter((q) => q.cat === CATEGORY_ORDER[0]);
+  const others = QUESTIONS.filter((q) => q.cat !== CATEGORY_ORDER[0]);
+  for (let i = 0; i < 10; i++) {
+    const pool = Math.random() < 0.5 ? basic : others;
+    const q = pool[Math.floor(Math.random() * pool.length)];
+    if (!hint || q.text !== hint.text) return q;
+  }
+  return QUESTIONS[0];
+}
+
+function renderHint() {
+  document.getElementById("hintCat").textContent = hint.cat;
+  document.getElementById("hintText").textContent = hint.text;
+}
+
+function nextHint() {
+  hint = pickHint();
+  document.getElementById("hintAnswer").value = "";
+  renderHint();
+  saveDraft();
+}
+
+function openBrowseModal() {
+  const listEl = document.getElementById("browseList");
+  listEl.innerHTML = "";
+  CATEGORY_ORDER.forEach((cat) => {
+    const title = document.createElement("div");
+    title.className = "browse-cat-title";
+    title.textContent = cat;
+    listEl.appendChild(title);
+    QUESTIONS.filter((q) => q.cat === cat).forEach((q) => {
+      const btn = document.createElement("button");
+      btn.className = "browse-q-item";
+      btn.textContent = q.text;
+      btn.addEventListener("click", () => {
+        hint = q;
+        document.getElementById("hintAnswer").value = "";
+        renderHint();
+        saveDraft();
+        closeBrowseModal();
+      });
+      listEl.appendChild(btn);
+    });
+  });
+  document.getElementById("browse-modal").classList.add("open");
+}
+
+function closeBrowseModal() {
+  document.getElementById("browse-modal").classList.remove("open");
+}
+
+// ---------- 書きかけの保存(この端末だけ) ----------
+
+function saveDraft() {
+  const draft = {
+    title: document.getElementById("titleInput").value,
+    body: document.getElementById("bodyInput").value,
+    answer: document.getElementById("hintAnswer").value,
+    trial: document.getElementById("trialInput").value,
+    condition: document.getElementById("conditionSelect").value,
+    sleep: document.getElementById("sleepInput").value,
+    hint,
+  };
+  lsSet(DRAFT_KEY, JSON.stringify(draft));
+}
+
+function restoreDraft() {
+  let d = null;
+  try {
+    d = JSON.parse(lsGet(DRAFT_KEY) || "null");
+  } catch (e) {
+    d = null;
+  }
+  if (!d) return false;
+  document.getElementById("titleInput").value = d.title || "";
+  document.getElementById("bodyInput").value = d.body || "";
+  document.getElementById("hintAnswer").value = d.answer || "";
+  document.getElementById("trialInput").value = d.trial || "";
+  document.getElementById("conditionSelect").value = d.condition || "";
+  document.getElementById("sleepInput").value = d.sleep || "";
+  if (d.hint && d.hint.text) hint = d.hint;
+  return true;
+}
+
+function clearForm() {
+  ["titleInput", "bodyInput", "hintAnswer", "trialInput", "sleepInput"].forEach((id) => {
+    document.getElementById(id).value = "";
+  });
+  document.getElementById("conditionSelect").value = "";
+  lsRemove(DRAFT_KEY);
+  timeTouched = false;
+  document.getElementById("whenInput").value = localDateTimeValue(new Date());
+}
+
+// ---------- 天気と月齢 ----------
+
+function mountWeather() {
+  if (!window.JmaWeather) return;
+  try {
+    wx = JmaWeather.mount({
+      target: document.getElementById("wxHere"),
+      storagePrefix: "sdlWx", // このアプリ用の保存の名前
+      defaultPoint: "21323", // 現在地が取れないときは胆振地方(気温は室蘭)
+    });
+  } catch (e) {
+    console.error(e);
+    wx = null;
+  }
+}
+
+// 保存する日記に書く「天気」と「月齢」の行を作る
+function weatherLines(dateStr) {
+  const lines = [];
+  if (!window.JmaWeather) return lines;
+  const now = Date.now();
+  const isToday = dateStr === todayStr();
+
+  // 天気は、今日の日記のときだけ記録する(予報なので、過去の日には使えない)
+  if (isToday && wx) {
+    try {
+      const d = wx.data();
+      if (d && d.weathers && d.weathers.length) {
+        const t = JmaWeather.days(d, now)[0];
+        const parts = [];
+        if (t.text) parts.push(t.text);
+        if (t.max != null) parts.push(`最高${t.max}℃`);
+        if (t.min != null) parts.push(`最低${t.min}℃`);
+        const pop = t.popsNow && t.popsNow[0] ? t.popsNow[0].v : null;
+        if (pop !== null && pop !== "") parts.push(`降水${pop}%`);
+        if (d.areaName) parts.push(`(${d.areaName})`);
+        const old = now - Date.parse(d.fetchedAt) > 3 * 3600 * 1000;
+        if (old) parts.push("※古い予報");
+        if (parts.length) lines.push(`- 天気: ${parts.join(" ")}`);
       }
-    });
-  });
+    } catch (e) {
+      console.error(e);
+    }
+  }
 
-  container.querySelectorAll(".answer-input").forEach((el) => {
-    el.addEventListener("input", () => {
-      const id = Number(el.dataset.cardId);
-      const card = questionCards.find((c) => c.id === id);
-      if (card) card.answer = el.value;
-    });
-  });
-  container.querySelectorAll(".reroll-single").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const id = Number(btn.dataset.cardId);
-      const card = questionCards.find((c) => c.id === id);
-      if (card) {
-        card.question = randomQuestionInCategory(card.question.cat);
-        card.answer = "";
-        renderQuestionCards();
-      }
-    });
-  });
-  container.querySelectorAll(".add-single").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      addQuestionCard(btn.dataset.cat);
-    });
-  });
-  container.querySelectorAll(".remove-card").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      removeQuestionCard(Number(btn.dataset.cardId));
-    });
-  });
+  // 月齢は計算なので、いつでも出せる(その日の日時で計算)
+  try {
+    const when = new Date(document.getElementById("whenInput").value);
+    const ms = isNaN(when.getTime()) ? now : when.getTime();
+    const m = JmaWeather.moon(ms);
+    lines.push(`- 月齢: ${m.age} ${m.name}(${m.trend}、光っている割合${m.illum}%)`);
+  } catch (e) {
+    console.error(e);
+  }
+  return lines;
 }
 
-function getAnswerFor(cardId) {
-  const card = questionCards.find((c) => c.id === cardId);
-  return card && card.answer ? card.answer.trim() : "";
-}
-
-// ---------- 本文組み立て ----------
+// ---------- 日記ファイル(1ファイル運用) ----------
 
 function buildSkeleton(dateStr) {
   const year = dateStr.slice(0, 4);
-  // 未回答の質問や空のセクション見出しは含めない。
-  // 回答があったカテゴリのセクションだけ、保存時に insertIntoSection が動的に追加する。
   return `# ${dateStr} の日記\n\n---\nタグ: #日記 #${year} #自己分析\n`;
 }
 
-// ---------- 1ファイル運用:日付ブロックの操作 ----------
-
 // 設定のpathは「ファイルのパス」。旧設定(フォルダ名のみ)の場合は 日記.md を補う
 function diaryFilePath(settings) {
-  const p = ((settings && settings.path) || "01_Daily").trim();
+  const p = ((settings && settings.path) || "diary").trim();
   return p.endsWith(".md") ? p : `${p.replace(/\/+$/, "")}/日記.md`;
 }
 
@@ -225,309 +383,18 @@ function getDayBlock(lines, dateStr) {
 }
 
 // 指定日のブロックだけを transformFn で書き換えて、ファイル全体を返す。
-// その日のブロックが無ければ新規作成し、ファイルの先頭(新しい日が上)に置く。
+// その日のブロックが無ければ新しく作り、日付の新しい順になる位置に置く。
 function updateDayBlock(fullContent, dateStr, transformFn) {
-  const lines =
-    fullContent.trim() === "" ? [] : fullContent.replace(/\n+$/, "").split("\n");
-  const block = getDayBlock(lines, dateStr);
-
-  if (!block) {
-    const newBlock = transformFn(buildSkeleton(dateStr)).replace(/\n+$/, "");
-    const out = [newBlock];
-    if (lines.length) out.push("", ...lines);
-    return out.join("\n") + "\n";
-  }
-
-  const dayContent = lines.slice(block.start, block.end).join("\n");
-  const newDay = transformFn(dayContent).replace(/\n+$/, "");
-  const before = lines.slice(0, block.start);
-  const after = lines.slice(block.end);
-  const out = [...before, ...newDay.split("\n")];
-  if (after.length) out.push("", ...after);
-  return out.join("\n") + "\n";
-}
-
-// ファイル内の日付一覧(新しい順)
-function listDiaryDates(content) {
-  const dates = [];
-  content.split("\n").forEach((l) => {
-    const m = l.match(/^# (\d{4}-\d{2}-\d{2}) の日記/);
-    if (m) dates.push(m[1]);
-  });
-  return dates.sort().reverse();
-}
-
-function extractDayText(content, dateStr) {
-  const lines = content.split("\n");
-  const block = getDayBlock(lines, dateStr);
-  if (!block) return "";
-  return lines.slice(block.start, block.end).join("\n").trim();
-}
-
-function insertConditionLine(content, conditionText) {
-  const lines = content.split("\n");
-  const condIdx = lines.findIndex((l) => l.startsWith("体調:"));
-  if (condIdx !== -1) {
-    lines[condIdx] = conditionText;
-    return lines.join("\n");
-  }
-  const titleIdx = lines.findIndex((l) => l.startsWith("# "));
-  const insertAt = titleIdx !== -1 ? titleIdx + 1 : 0;
-  lines.splice(insertAt, 0, "", conditionText);
-  return lines.join("\n");
-}
-
-// セクション末尾(最後の中身の行の直後)に block を挿入する。余計な空行は増やさない
-function insertAtSectionEnd(lines, startIdx, block) {
-  let endIdx = lines.length;
-  for (let i = startIdx + 1; i < lines.length; i++) {
-    if (lines[i].startsWith("## ") || lines[i].startsWith("---")) {
-      endIdx = i;
-      break;
-    }
-  }
-  let last = endIdx - 1;
-  while (last > startIdx && lines[last].trim() === "") last--;
-  const before = lines.slice(0, last + 1);
-  const after = lines.slice(endIdx);
-  before.push(block);
-  if (after.length) before.push("");
-  return [...before, ...after].join("\n");
-}
-
-function insertIntoSection(content, categoryHeading, block) {
-  const lines = content.split("\n");
-  const headingLine = "## " + categoryHeading;
-  let startIdx = lines.findIndex((l) => l.trim() === headingLine);
-
-  if (startIdx === -1) {
-    return appendSectionBeforeTags(content, categoryHeading, block);
-  }
-
-  return insertAtSectionEnd(lines, startIdx, block);
-}
-
-function appendSectionBeforeTags(content, heading, block) {
-  const lines = content.split("\n");
-  let tagIdx = lines.findIndex((l) => l.startsWith("---"));
-  if (tagIdx === -1) tagIdx = lines.length;
-  const before = lines.slice(0, tagIdx);
-  const after = lines.slice(tagIdx);
-  if (before[before.length - 1].trim() !== "") before.push("");
-  before.push(`## ${heading}`, block, "");
-  return [...before, ...after].join("\n");
-}
-
-function appendFreeText(content, freeText, tags) {
-  const tagStr = tags && tags.length ? ` [タグ: ${tags.join(", ")}]` : "";
-  const block = `- (${timeStr()})${tagStr} ${freeText}`;
-  const lines = content.split("\n");
-  const headingLine = "## 自由記述";
-  let startIdx = lines.findIndex((l) => l.trim() === headingLine);
-
-  if (startIdx === -1) {
-    return appendSectionBeforeTags(content, "自由記述", block);
-  }
-  return insertAtSectionEnd(lines, startIdx, block);
-}
-
-// ---------- GitHub API ----------
-
-async function githubGetFile(settings, filePath) {
-  const url = `https://api.github.com/repos/${settings.owner}/${settings.repo}/contents/${filePath}?ref=${settings.branch}`;
-  const res = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${settings.pat}`,
-      Accept: "application/vnd.github+json",
-    },
-  });
-  if (res.status === 404) return { content: null, sha: null };
-  if (!res.ok) throw new Error(`GitHub取得エラー: ${res.status}`);
-  const data = await res.json();
-  return { content: b64DecodeUnicode(data.content), sha: data.sha };
-}
-
-async function githubPutFile(settings, filePath, content, sha, message) {
-  const url = `https://api.github.com/repos/${settings.owner}/${settings.repo}/contents/${filePath}`;
-  const body = {
-    message,
-    content: b64EncodeUnicode(content),
-    branch: settings.branch,
-  };
-  if (sha) body.sha = sha;
-  const res = await fetch(url, {
-    method: "PUT",
-    headers: {
-      Authorization: `Bearer ${settings.pat}`,
-      Accept: "application/vnd.github+json",
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(`GitHub保存エラー: ${res.status} ${errText}`);
-  }
-}
-
-// ---------- 保存処理 ----------
-
-async function handleSave() {
-  const settings = loadSettings();
-  if (!settings || !settings.pat || !settings.owner || !settings.repo) {
-    setStatus("先に設定(⚙️)を入力してください");
-    openSettings();
-    return;
-  }
-
-  const saveBtn = document.getElementById("saveBtn");
-  saveBtn.disabled = true;
-  setStatus("保存中...");
-
-  try {
-    const dateStr = todayStr();
-    const filePath = diaryFilePath(settings);
-
-    // その日のブロックに対して行う変更を集める
-    const transforms = [];
-
-    const condition = document.getElementById("conditionSelect").value;
-    const sleep = document.getElementById("sleepInput").value;
-
-    if (condition || sleep) {
-      const parts = [];
-      if (condition) parts.push(`体調: ${condition}`);
-      if (sleep) parts.push(`睡眠時間: ${sleep}時間`);
-      parts.push(`(${timeStr()})`);
-      const condLine = parts.join("　");
-      transforms.push((b) => insertConditionLine(b, condLine));
-    }
-
-    for (const c of questionCards) {
-      const answer = getAnswerFor(c.id);
-      if (answer) {
-        const qBlock = `- **Q:** ${c.question.text} (${timeStr()})\n  - ${answer}`;
-        const cat = c.question.cat;
-        transforms.push((b) => insertIntoSection(b, cat, qBlock));
-      }
-    }
-
-    const freeText = document.getElementById("freeText").value.trim();
-    if (freeText) {
-      const tags = selectedFreeTags.slice();
-      transforms.push((b) => appendFreeText(b, freeText, tags));
-    }
-
-    if (transforms.length === 0) {
-      setStatus("入力がありません");
-      saveBtn.disabled = false;
-      return;
-    }
-
-    // 保存直前にGitHubの最新を取得してから、今日のブロックだけを書き換える
-    const { content, sha } = await githubGetFile(settings, filePath);
-    const newContent = updateDayBlock(content || "", dateStr, (block) =>
-      transforms.reduce((acc, fn) => fn(acc), block)
-    );
-
-    await githubPutFile(
-      settings,
-      filePath,
-      newContent,
-      sha,
-      `diary: ${dateStr} app update`
-    );
-
-    setStatus("保存しました ✓");
-    document.getElementById("freeText").value = "";
-    selectedFreeTags = [];
-    document.getElementById("tagPicker").classList.remove("open");
-    questionCards = [];
-    initDefaultCards();
-  } catch (e) {
-    console.error(e);
-    setStatus("エラー: " + e.message);
-  } finally {
-    saveBtn.disabled = false;
-  }
-}
-
-// ---------- 自由記述タグ ----------
-
-function renderTagPicker() {
-  const picker = document.getElementById("tagPicker");
-  picker.innerHTML = "";
-  CATEGORY_ORDER.forEach((cat) => {
-    const pill = document.createElement("button");
-    pill.className = "tag-pill" + (selectedFreeTags.includes(cat) ? " selected" : "");
-    pill.textContent = cat;
-    pill.addEventListener("click", () => {
-      if (selectedFreeTags.includes(cat)) {
-        selectedFreeTags = selectedFreeTags.filter((t) => t !== cat);
-      } else {
-        selectedFreeTags.push(cat);
-      }
-      renderTagPicker();
-    });
-    picker.appendChild(pill);
-  });
-}
-
-function toggleTagPicker() {
-  const picker = document.getElementById("tagPicker");
-  if (picker.classList.contains("open")) {
-    picker.classList.remove("open");
+  const parsed = parseDayBlocks(fullContent || "");
+  const idx = parsed.blocks.findIndex((b) => b.date === dateStr);
+  if (idx === -1) {
+    const text = transformFn(buildSkeleton(dateStr));
+    parsed.blocks.push({ date: dateStr, lines: text.replace(/\n+$/, "").split("\n") });
   } else {
-    renderTagPicker();
-    picker.classList.add("open");
+    const text = transformFn(parsed.blocks[idx].lines.join("\n").replace(/\n+$/, ""));
+    parsed.blocks[idx].lines = text.replace(/\n+$/, "").split("\n");
   }
-}
-
-// ---------- 質問一覧モーダル ----------
-
-function openBrowseModal() {
-  const listEl = document.getElementById("browseList");
-  listEl.innerHTML = "";
-  CATEGORY_ORDER.forEach((cat) => {
-    const title = document.createElement("div");
-    title.className = "browse-cat-title";
-    title.textContent = cat;
-    listEl.appendChild(title);
-
-    QUESTIONS.filter((q) => q.cat === cat).forEach((q) => {
-      const btn = document.createElement("button");
-      btn.className = "browse-q-item";
-      btn.textContent = q.text;
-      btn.addEventListener("click", () => {
-        const id = ++cardSeq;
-        questionCards.push({ id, question: q });
-        renderQuestionCards();
-        closeBrowseModal();
-      });
-      listEl.appendChild(btn);
-    });
-  });
-  document.getElementById("browse-modal").classList.add("open");
-}
-
-function closeBrowseModal() {
-  document.getElementById("browse-modal").classList.remove("open");
-}
-
-// ---------- 過去の日記を見る ----------
-
-// ---------- 日付別ファイル → 日記.md への統合 ----------
-
-async function githubListFolder(settings, folderPath) {
-  const url = `https://api.github.com/repos/${settings.owner}/${settings.repo}/contents/${folderPath}?ref=${settings.branch}`;
-  const res = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${settings.pat}`,
-      Accept: "application/vnd.github+json",
-    },
-  });
-  if (!res.ok) throw new Error(`一覧取得エラー: ${res.status}`);
-  return res.json();
+  return buildDiaryFile(parsed.preamble, parsed.blocks);
 }
 
 // 日記ファイルを「日付ブロックの配列」に分解する
@@ -562,7 +429,47 @@ function buildDiaryFile(preamble, blocks) {
   return parts.join("\n\n") + "\n";
 }
 
-// 日付別ファイルの中身を、1ファイル運用の1日ブロックとして使える形に整える
+function listDiaryDates(content) {
+  return parseDayBlocks(content)
+    .blocks.map((b) => b.date)
+    .sort()
+    .reverse();
+}
+
+function extractDayText(content, dateStr) {
+  const lines = content.split("\n");
+  const block = getDayBlock(lines, dateStr);
+  if (!block) return "";
+  return lines.slice(block.start, block.end).join("\n").trim();
+}
+
+// その日のブロックの「---(タグの行)」の手前に、見出しと中身を足す
+function appendSectionBeforeTags(content, heading, block) {
+  const lines = content.split("\n");
+  let tagIdx = lines.findIndex((l) => l.startsWith("---"));
+  if (tagIdx === -1) tagIdx = lines.length;
+  const before = lines.slice(0, tagIdx);
+  const after = lines.slice(tagIdx);
+  if (before.length && before[before.length - 1].trim() !== "") before.push("");
+  before.push(`## ${heading}`, block, "");
+  return [...before, ...after].join("\n");
+}
+
+// 本文の中の「# 」「---」で始まる行は、日の区切りやタグの行と間違えるので、形を少し変える
+function safeText(text) {
+  return text
+    .replace(/\r\n/g, "\n")
+    .split("\n")
+    .map((l) => {
+      if (/^#\s/.test(l)) return "＃" + l.slice(1);
+      if (/^---/.test(l)) return "ー" + l.slice(1);
+      return l;
+    })
+    .join("\n")
+    .trim();
+}
+
+// 日記を開いたまま別の日へ移すときの、見出し合わせ(編集の保存で使う)
 function normalizeImportedDay(date, raw) {
   const lines = raw.replace(/\r\n/g, "\n").replace(/\n+$/, "").split("\n");
   const heading = `# ${date} の日記`;
@@ -573,96 +480,244 @@ function normalizeImportedDay(date, raw) {
   } else {
     lines.unshift(heading, "");
   }
-  // 2行目以降の「# 」は日の区切りと誤認されないよう「## 」に下げる
   for (let i = 1; i < lines.length; i++) {
     if (lines[i].startsWith("# ")) lines[i] = "#" + lines[i];
   }
   return lines.join("\n");
 }
 
-async function migrateDailyFiles() {
-  const out = document.getElementById("migrateStatus");
-  const s = settingsFromForm();
-  if (!s.pat || !s.owner || !s.repo) {
-    out.textContent = "先にトークン・オーナー・リポジトリ名を入力してください";
-    return;
-  }
-  if (!window.confirm("日付ごとのファイルを日記.mdに統合します。元のファイルは削除しません。よろしいですか?")) {
-    return;
-  }
-  out.textContent = "確認中...";
-  try {
-    const filePath = diaryFilePath(s);
-    const folder = filePath.includes("/") ? filePath.slice(0, filePath.lastIndexOf("/")) : "";
-    const list = await githubListFolder(s, folder);
-    const dayFiles = list
-      .filter((f) => f.type === "file" && /^\d{4}-\d{2}-\d{2}\.md$/.test(f.name))
-      .sort((a, b) => (a.name < b.name ? -1 : 1));
-    if (dayFiles.length === 0) {
-      out.textContent = "統合する日付別ファイルはありません";
-      return;
-    }
+// ---------- GitHub API ----------
 
-    const { content: existing, sha } = await githubGetFile(s, filePath);
-    const parsed = parseDayBlocks(existing || "");
-    const have = new Set(parsed.blocks.map((b) => b.date));
-    let added = 0;
-    let skipped = 0;
-    for (const f of dayFiles) {
-      const date = f.name.slice(0, 10);
-      if (have.has(date)) {
-        skipped++;
-        continue;
-      }
-      const { content } = await githubGetFile(s, f.path);
-      if (content === null || content.trim() === "") {
-        skipped++;
-        continue;
-      }
-      parsed.blocks.push({ date, lines: normalizeImportedDay(date, content).split("\n") });
-      have.add(date);
-      added++;
+async function githubGetFile(settings, filePath) {
+  const url = `https://api.github.com/repos/${settings.owner}/${settings.repo}/contents/${filePath}?ref=${settings.branch}`;
+  const res = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${settings.pat}`,
+      Accept: "application/vnd.github+json",
+    },
+    cache: "no-store",
+  });
+  if (res.status === 404) return { content: null, sha: null };
+  if (!res.ok) throw new Error(`GitHub取得エラー: ${res.status}`);
+  const data = await res.json();
+  return { content: b64DecodeUnicode(data.content), sha: data.sha };
+}
+
+async function githubPutFile(settings, filePath, content, sha, message) {
+  const url = `https://api.github.com/repos/${settings.owner}/${settings.repo}/contents/${filePath}`;
+  const body = { message, content: b64EncodeUnicode(content), branch: settings.branch };
+  if (sha) body.sha = sha;
+  const res = await fetch(url, {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${settings.pat}`,
+      Accept: "application/vnd.github+json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`GitHub保存エラー: ${res.status} ${errText}`);
+  }
+}
+
+async function githubListFolder(settings, folderPath) {
+  const url = `https://api.github.com/repos/${settings.owner}/${settings.repo}/contents/${folderPath}?ref=${settings.branch}`;
+  const res = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${settings.pat}`,
+      Accept: "application/vnd.github+json",
+    },
+  });
+  if (!res.ok) throw new Error(`一覧取得エラー: ${res.status}`);
+  return res.json();
+}
+
+// 日記ファイルを読む(読んだものは覚えておき、検索や1年前の表示に使う)
+async function loadDiary(force) {
+  if (viewCache && !force) return viewCache.content;
+  const settings = loadSettings();
+  const { content } = await githubGetFile(settings, diaryFilePath(settings));
+  viewCache = { content: content || "" };
+  return viewCache.content;
+}
+
+// ---------- 保存 ----------
+
+async function handleSave() {
+  const settings = loadSettings();
+  if (!hasSettings(settings)) {
+    setStatus("先に設定(⚙️)を入力してください");
+    openSettings();
+    return;
+  }
+
+  const title = document.getElementById("titleInput").value.trim();
+  const body = safeText(document.getElementById("bodyInput").value);
+  const answer = safeText(document.getElementById("hintAnswer").value);
+  const trial = document.getElementById("trialInput").value.trim().replace(/\s*\n\s*/g, " ");
+  const condition = document.getElementById("conditionSelect").value;
+  const sleep = document.getElementById("sleepInput").value;
+
+  if (!title && !body && !answer && !trial) {
+    setStatus("入力がありません");
+    return;
+  }
+
+  // 日時(手で変えていなければ、保存した時刻)
+  let when = new Date(document.getElementById("whenInput").value);
+  if (!timeTouched || isNaN(when.getTime())) when = new Date();
+  const dateStr = dateKey(when);
+  const hm = `${pad2(when.getHours())}:${pad2(when.getMinutes())}`;
+
+  const saveBtn = document.getElementById("saveBtn");
+  saveBtn.disabled = true;
+  setStatus("保存中...");
+
+  try {
+    // 1件分の中身を組み立てる
+    const meta = weatherLines(dateStr);
+    if (condition || sleep) {
+      const parts = [];
+      if (condition) parts.push(`体調: ${condition}`);
+      if (sleep) parts.push(`睡眠: ${sleep}時間`);
+      meta.push(`- ${parts.join("　")}`);
     }
-    if (added === 0) {
-      out.textContent = `追加する日記はありませんでした(統合済み・空ファイル: ${skipped}件)`;
+    const chunks = [];
+    if (meta.length) chunks.push(meta.join("\n"));
+    if (body) chunks.push(body);
+    if (answer && hint) {
+      const a = answer.split("\n").join("\n    ");
+      chunks.push(`- **Q:** ${hint.text}\n  - ${a}`);
+    }
+    if (trial) chunks.push(`- **試すこと:** ${trial}`);
+    const heading = `${hm} ${title || "(タイトルなし)"}`;
+    const entry = chunks.join("\n\n");
+
+    // 保存の直前にGitHubの最新を読み、その日のブロックだけを書き換える
+    const filePath = diaryFilePath(settings);
+    const { content, sha } = await githubGetFile(settings, filePath);
+    const newContent = updateDayBlock(content || "", dateStr, (b) =>
+      appendSectionBeforeTags(b, heading, entry)
+    );
+    await githubPutFile(settings, filePath, newContent, sha, `diary: ${dateStr} ${hm}`);
+
+    viewCache = { content: newContent };
+    setStatus("保存しました ✓");
+    clearForm();
+    nextHint();
+    loadLookback();
+  } catch (e) {
+    console.error(e);
+    setStatus("エラー: " + e.message + "(書いた内容は消えていません)");
+  } finally {
+    saveBtn.disabled = false;
+  }
+}
+
+// ---------- 1年前の今日 ----------
+
+function oneYearAgo() {
+  const d = new Date();
+  const y = d.getFullYear() - 1;
+  let m = d.getMonth();
+  let day = d.getDate();
+  if (m === 1 && day === 29) day = 28; // うるう日は2月28日にする
+  return dateKey(new Date(y, m, day));
+}
+
+async function loadLookback() {
+  const box = document.getElementById("lookbackBody");
+  const btn = document.getElementById("lookbackOpenBtn");
+  const target = oneYearAgo();
+  document.getElementById("lookbackDate").textContent = target;
+  btn.style.display = "none";
+  if (!hasSettings(loadSettings())) {
+    box.textContent = "設定(⚙️)を入れると表示します";
+    return;
+  }
+  box.textContent = "読み込み中...";
+  try {
+    const content = await loadDiary(false);
+    const text = extractDayText(content, target);
+    if (!text) {
+      box.textContent = "この日の日記はまだありません";
       return;
     }
-    await githubPutFile(
-      s,
-      filePath,
-      buildDiaryFile(parsed.preamble, parsed.blocks),
-      sha,
-      `diary: merge ${added} daily files`
-    );
-    out.textContent = `${added}日分を ${filePath} に統合しました。元の日付別ファイルは残してあります(確認後にPCで削除してください)`;
+    const lines = text.split("\n").slice(1).join("\n").replace(/---[\s\S]*$/, "").trim();
+    box.textContent = lines.length > 160 ? lines.slice(0, 160) + "…" : lines || "(空)";
+    btn.style.display = "inline-block";
+  } catch (e) {
+    box.textContent = "読めませんでした: " + e.message;
+  }
+}
+
+// ---------- 検索 ----------
+
+async function runSearch() {
+  const q = document.getElementById("searchInput").value.trim();
+  const out = document.getElementById("searchResults");
+  out.innerHTML = "";
+  if (!q) return;
+  if (!hasSettings(loadSettings())) {
+    out.textContent = "先に設定(⚙️)を入力してください";
+    return;
+  }
+  out.textContent = "検索中...";
+  try {
+    const content = await loadDiary(true);
+    const words = q.toLowerCase().split(/\s+/).filter(Boolean);
+    const hits = parseDayBlocks(content).blocks.filter((b) => {
+      const t = b.lines.join("\n").toLowerCase();
+      return words.every((w) => t.includes(w)); // すべての言葉を含む日
+    });
+    out.innerHTML = "";
+    const count = document.createElement("p");
+    count.className = "hint";
+    count.textContent = `${hits.length}日分 見つかりました`;
+    out.appendChild(count);
+    hits
+      .sort((a, b) => (a.date < b.date ? 1 : -1))
+      .forEach((b) => {
+        const text = b.lines.slice(1).join(" ").replace(/\s+/g, " ");
+        const pos = text.toLowerCase().indexOf(words[0]);
+        const from = Math.max(0, pos - 20);
+        const snippet = (from > 0 ? "…" : "") + text.slice(from, from + 60) + "…";
+        const btn = document.createElement("button");
+        btn.className = "browse-q-item";
+        btn.innerHTML = `<strong>${escapeHtml(b.date)}</strong><br><span class="snippet">${escapeHtml(snippet)}</span>`;
+        btn.addEventListener("click", () => {
+          openViewModalShell();
+          showEntry(b.date);
+        });
+        out.appendChild(btn);
+      });
   } catch (e) {
     out.textContent = "エラー: " + e.message;
   }
 }
 
-let viewCache = null; // { content }
+// ---------- 過去の日記を見る・直す ----------
+
+function openViewModalShell() {
+  document.getElementById("viewModalTitle").textContent = "過去の日記";
+  document.getElementById("viewStatus").textContent = "";
+  document.getElementById("view-modal").classList.add("open");
+}
 
 async function openViewModal() {
-  const settings = loadSettings();
-  if (!settings || !settings.pat) {
+  if (!hasSettings(loadSettings())) {
     setStatus("先に設定(⚙️)を入力してください");
     openSettings();
     return;
   }
-  document.getElementById("viewModalTitle").textContent = "過去の日記";
-  document.getElementById("viewStatus").textContent = "";
+  openViewModalShell();
   setViewMode("list");
   const listEl = document.getElementById("viewDateList");
-  listEl.innerHTML = "読み込み中...";
-  document.getElementById("view-modal").classList.add("open");
-
+  listEl.textContent = "読み込み中...";
   try {
-    const { content } = await githubGetFile(settings, diaryFilePath(settings));
-    if (content === null) {
-      listEl.textContent = "まだ日記がありません";
-      return;
-    }
-    viewCache = { content };
+    const content = await loadDiary(true);
     const dates = listDiaryDates(content);
     listEl.innerHTML = "";
     if (dates.length === 0) {
@@ -680,8 +735,6 @@ async function openViewModal() {
     listEl.textContent = "エラー: " + e.message;
   }
 }
-
-let currentViewDate = null;
 
 function setViewMode(mode) {
   // mode: "list"(日付一覧) / "read"(閲覧) / "edit"(編集)
@@ -707,13 +760,11 @@ function showEntry(dateStr) {
 
 // 編集開始:PC側で更新されている可能性があるので、必ず最新をGitHubから取り直す
 async function startEditEntry() {
-  const settings = loadSettings();
   const statusEl = document.getElementById("viewStatus");
   statusEl.textContent = "最新を取得中...";
   try {
-    const { content } = await githubGetFile(settings, diaryFilePath(settings));
-    viewCache = { content: content || "" };
-    document.getElementById("viewEditArea").value = extractDayText(viewCache.content, currentViewDate);
+    const content = await loadDiary(true);
+    document.getElementById("viewEditArea").value = extractDayText(content, currentViewDate);
     statusEl.textContent = "";
     setViewMode("edit");
   } catch (e) {
@@ -765,20 +816,57 @@ function closeViewModal() {
 
 // ---------- 初期化 ----------
 
-document.getElementById("gearBtn").addEventListener("click", openSettings);
-document.getElementById("saveSettingsBtn").addEventListener("click", closeSettings);
-document.getElementById("browseQuestionsBtn").addEventListener("click", openBrowseModal);
-document.getElementById("tagToggleBtn").addEventListener("click", toggleTagPicker);
-document.getElementById("closeBrowseBtn").addEventListener("click", closeBrowseModal);
-document.getElementById("viewPastBtn").addEventListener("click", openViewModal);
-document.getElementById("closeViewBtn").addEventListener("click", closeViewModal);
-document.getElementById("editEntryBtn").addEventListener("click", startEditEntry);
-document.getElementById("cancelEditBtn").addEventListener("click", cancelEditEntry);
-document.getElementById("saveEditBtn").addEventListener("click", saveEditEntry);
-document.getElementById("saveBtn").addEventListener("click", handleSave);
-document.getElementById("migrateBtn").addEventListener("click", migrateDailyFiles);
+function on(id, ev, fn) {
+  document.getElementById(id).addEventListener(ev, fn);
+}
 
-initDefaultCards();
-if (!loadSettings()) {
+document.querySelectorAll(".tab-btn").forEach((b) => {
+  b.addEventListener("click", () => showTab(b.dataset.tab));
+});
+on("gearBtn", "click", openSettings);
+on("saveSettingsBtn", "click", closeSettings);
+on("beingEditBtn", "click", startEditBeing);
+on("beingSaveBtn", "click", saveBeing);
+on("beingCancelBtn", "click", cancelBeing);
+on("hintNextBtn", "click", nextHint);
+on("browseQuestionsBtn", "click", openBrowseModal);
+on("closeBrowseBtn", "click", closeBrowseModal);
+on("saveBtn", "click", handleSave);
+on("searchBtn", "click", runSearch);
+on("searchInput", "keydown", (e) => {
+  if (e.key === "Enter") runSearch();
+});
+on("lookbackOpenBtn", "click", () => {
+  openViewModalShell();
+  showEntry(oneYearAgo());
+});
+on("viewPastBtn", "click", openViewModal);
+on("closeViewBtn", "click", closeViewModal);
+on("editEntryBtn", "click", startEditEntry);
+on("cancelEditBtn", "click", cancelEditEntry);
+on("saveEditBtn", "click", saveEditEntry);
+on("whenInput", "change", () => {
+  timeTouched = true;
+});
+["titleInput", "bodyInput", "hintAnswer", "trialInput", "conditionSelect", "sleepInput"].forEach(
+  (id) => on(id, "input", saveDraft)
+);
+
+// 日時は、手で変えていなければ1分ごとに今の時刻に合わせる
+document.getElementById("whenInput").value = localDateTimeValue(new Date());
+setInterval(() => {
+  if (!timeTouched) document.getElementById("whenInput").value = localDateTimeValue(new Date());
+}, 60000);
+
+document.getElementById("policyText").textContent = todayPolicy();
+renderBeing();
+if (!restoreDraft() || !hint) hint = pickHint();
+renderHint();
+mountWeather();
+showTab("diary");
+
+if (!hasSettings(loadSettings())) {
   openSettings();
+} else {
+  loadLookback();
 }

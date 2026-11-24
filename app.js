@@ -163,6 +163,8 @@ function showTab(name) {
   document.querySelectorAll(".tab-panel").forEach((p) => {
     p.classList.toggle("active", p.id === "tab-" + name);
   });
+  // 振り返りタブを開いたら、その週の日記を読み直す(review.js)
+  if (name === "review" && typeof openReviewTab === "function") openReviewTab();
 }
 
 // ---------- ありたい姿と今日の行動方針 ----------

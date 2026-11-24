@@ -140,6 +140,7 @@ function openSettings() {
   document.getElementById("branchInput").value = s.branch || "main";
   document.getElementById("pathInput").value = diaryFilePath(s);
   setPatVisible(false);
+  renderThemeList(); // 見た目は、変更ボタンを押さなくても選べる
   // まだ設定がないときだけ、最初から書き換えられる
   setSettingsLock(!hasSettings(s));
   document.getElementById("settingsMsg").textContent = "";
@@ -1067,6 +1068,77 @@ on("actBadBtn", "click", () => setAct("動けなかった"));
   (id) => on(id, "input", saveDraft)
 );
 
+// ---------- 見た目(テーマ)の切り替え ----------
+
+const THEME_KEY = "sdlTheme";
+// 季節で自動のときの、月ごとの色 [名前, 濃い色, 薄い色, 地の色]
+const SEASON_COLORS = [
+  ["松の緑", "#2f5d50", "#e3ece8", "#f5f6f1"], // 1月 睦月
+  ["梅", "#a8395a", "#f5e4ea", "#fbf5f6"], // 2月 如月
+  ["桃", "#c0587e", "#f8e5ed", "#fdf5f8"], // 3月 弥生
+  ["桜", "#b5607a", "#f6e6eb", "#fdf7f8"], // 4月 卯月
+  ["新緑", "#4f7d3a", "#e6efdf", "#f5f8f0"], // 5月 皐月
+  ["紫陽花", "#5a5fa8", "#e6e7f4", "#f5f5fa"], // 6月 水無月
+  ["夏の海", "#1f6aa5", "#e0edf7", "#f2f7fb"], // 7月 文月
+  ["向日葵", "#b0730e", "#f6ecd8", "#fdf9f0"], // 8月 葉月
+  ["桔梗", "#6b5aa6", "#ebe7f4", "#f7f5fa"], // 9月 長月
+  ["柿", "#c0602a", "#f6e5da", "#fcf6f1"], // 10月 神無月
+  ["枯葉", "#8a5a2b", "#f0e6da", "#f8f3ec"], // 11月 霜月
+  ["雪と紺", "#2d4a7a", "#e3e9f2", "#f3f6fa"], // 12月 師走
+];
+function seasonColor() {
+  return SEASON_COLORS[new Date().getMonth()];
+}
+// [テーマの名前, 表示する名前, 見本の色]
+function themeList() {
+  const s = seasonColor();
+  return [
+    ["blue", "標準・藍ブルー", "#2b4c8c"],
+    ["green", "標準・グリーン", "#2e6b4f"],
+    ["wa", "和風(藍・朱)", "linear-gradient(135deg, #264e70 50%, #c0462b 50%)"],
+    ["night", "夜", "linear-gradient(135deg, #0e1524 50%, #d9b86a 50%)"],
+    ["season", `季節で自動(今月: ${s[0]})`, s[1]],
+  ];
+}
+
+function currentTheme() {
+  const t = lsGet(THEME_KEY);
+  return themeList().some((x) => x[0] === t) ? t : "blue";
+}
+
+function applyTheme(name) {
+  const root = document.documentElement;
+  if (name === "blue") delete root.dataset.theme;
+  else root.dataset.theme = name;
+  // 季節で自動のときだけ、その月の色を入れる
+  const props = ["--accent", "--accent-soft", "--bg"];
+  if (name === "season") {
+    const s = seasonColor();
+    props.forEach((p, i) => root.style.setProperty(p, s[i + 1]));
+  } else {
+    props.forEach((p) => root.style.removeProperty(p));
+  }
+}
+
+function renderThemeList() {
+  const el = document.getElementById("themeList");
+  const cur = currentTheme();
+  el.innerHTML = "";
+  themeList().forEach(([key, label, sw]) => {
+    const b = document.createElement("button");
+    b.className = "theme-btn" + (key === cur ? " on" : "");
+    b.innerHTML = `<span class="theme-sw" style="background:${sw}"></span><span>${escapeHtml(label)}</span>`;
+    b.addEventListener("click", () => {
+      lsSet(THEME_KEY, key);
+      applyTheme(key);
+      renderThemeList();
+    });
+    el.appendChild(b);
+  });
+}
+
+applyTheme(currentTheme());
+
 // タイトルの下に「2026年11月(霜月)」(西暦の年月と、和風月名)
 const WAFU_MONTHS = ["睦月", "如月", "弥生", "卯月", "皐月", "水無月", "文月", "葉月", "長月", "神無月", "霜月", "師走"];
 function renderHeadDate() {
@@ -1081,6 +1153,7 @@ document.getElementById("whenInput").value = localDateTimeValue(new Date());
 setInterval(() => {
   if (!timeTouched) document.getElementById("whenInput").value = localDateTimeValue(new Date());
   renderHeadDate();
+  if (currentTheme() === "season") applyTheme("season"); // 月が変わったら色も変える
 }, 60000);
 
 document.getElementById("policyText").textContent = todayPolicy();

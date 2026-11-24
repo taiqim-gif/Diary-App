@@ -5,17 +5,76 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>私の日記</title>
 <link rel="manifest" href="manifest.json">
+<script>
+  // 選んだ見た目を、画面が出る前に入れる(一瞬ちがう色が出ないように)
+  try { var t = localStorage.getItem("sdlTheme"); if (t && t !== "blue") document.documentElement.dataset.theme = t; } catch (e) {}
+</script>
 <style>
+  /* 見た目(テーマ)。設定画面で切り替え、<html data-theme="..."> で色を差し替える */
+  /* 標準・藍ブルー(いつもの見た目) */
   :root {
-    --bg: #f7f5f2;
+    --bg: #f4f6f9;
     --card: #ffffff;
-    --accent: #4a4a8a;
-    --accent-soft: #ecebf7;
-    --text: #2b2b2b;
-    --muted: #8a8a8a;
-    --border: #e3e0da;
-    --field: #fcfcfb;
+    --accent: #2b4c8c;
+    --accent-soft: #e5ebf6;
+    --on-accent: #ffffff;
+    --text: #22262e;
+    --muted: #7d8592;
+    --border: #dfe4ec;
+    --field: #fbfcfd;
+    --readonly: #eef1f5;
+    --good: #2e7d5b;
+    --bad: #a5473b;
+    --radius: 14px;
+    --shadow: 0 1px 3px rgba(0,0,0,0.06);
+    --head-font: inherit;
+    color-scheme: light;
   }
+  /* 標準・グリーン */
+  :root[data-theme="green"] {
+    --bg: #f3f7f4;
+    --accent: #2e6b4f;
+    --accent-soft: #e2efe7;
+    --border: #dce7df;
+    --readonly: #edf2ee;
+  }
+  /* 和風: 生成りの紙に、藍・朱・抹茶 */
+  :root[data-theme="wa"] {
+    --bg: #f2ecdf;
+    --card: #fbf8f1;
+    --accent: #264e70;
+    --accent-soft: #e4e8e6;
+    --text: #2b2620;
+    --muted: #8a7f6e;
+    --border: #ddd3c0;
+    --field: #fffdf8;
+    --readonly: #efe9dc;
+    --good: #5b7a3a;
+    --bad: #c0462b;
+    --radius: 6px;
+    --shadow: none;
+    --head-font: "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif;
+  }
+  /* 夜: 黒に近い紺に、月のような淡い金 */
+  :root[data-theme="night"] {
+    --bg: #0e1524;
+    --card: #172138;
+    --accent: #d9b86a;
+    --accent-soft: #252f48;
+    --on-accent: #1a1d26;
+    --text: #e4e7ee;
+    --muted: #8f98ad;
+    --border: #2a3552;
+    --field: #111a2d;
+    --readonly: #1c2640;
+    --good: #5fae8a;
+    --bad: #e07a6a;
+    --shadow: 0 1px 4px rgba(0,0,0,0.4);
+    color-scheme: dark;
+  }
+  /* 季節で自動: 色は app.js が月ごとに入れる(--accent など) */
+  :root[data-theme="season"] { --radius: 10px; }
+
   * { box-sizing: border-box; }
   body {
     margin: 0;
@@ -23,7 +82,37 @@
     background: var(--bg);
     color: var(--text);
     padding: env(safe-area-inset-top) 16px env(safe-area-inset-bottom);
+    transition: background 0.3s;
   }
+  h1, .rv-week, .modal-header strong { font-family: var(--head-font); }
+  /* 天気の部品の色も、テーマに合わせる */
+  #wxHere .jw-r2 { color: var(--accent); }
+  :root[data-theme="night"] #wxHere .jw-r1 { color: #7fd3cf; }
+  :root[data-theme="night"] .jw-sheet { background: var(--card); color: var(--text); border-top-color: var(--border); }
+  :root[data-theme="night"] .jw-tbl th, :root[data-theme="night"] .jw-tbl td { border-color: var(--border); }
+  :root[data-theme="night"] .jw-tbl thead th { background: var(--accent-soft); color: var(--accent); }
+  :root[data-theme="night"] .jw-tbl tbody th { background: var(--field); color: var(--muted); }
+  :root[data-theme="night"] .jw-moon { background: var(--field); border-color: var(--border); }
+  :root[data-theme="night"] .jw-moon .jw-age { color: var(--text); }
+  body .jw-btns button, body .jw-speed button { border-color: var(--accent); color: var(--accent); background: var(--field); }
+  body .jw-btns button.jw-primary, body .jw-speed button.on { background: var(--accent); color: var(--on-accent); }
+  body .jw-tbl thead th { color: var(--accent); }
+  /* テーマを選ぶボタン */
+  .theme-list { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
+  .theme-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px;
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    background: var(--field);
+    color: var(--text);
+    font-size: 0.88rem;
+    text-align: left;
+  }
+  .theme-btn.on { border-color: var(--accent); font-weight: 700; }
+  .theme-sw { width: 22px; height: 22px; border-radius: 50%; flex: none; border: 1px solid rgba(0,0,0,0.15); }
   header {
     padding: 16px 0 10px;
     display: flex;
@@ -36,11 +125,11 @@
   /* 西暦の年月と、和風月名(霜月など) */
   #headDate { font-size: 0.74rem; color: var(--accent); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
   /* GitHubの設定(ふだんは書き換えられない) */
-  input[readonly] { background: #f1f0ec; color: var(--muted); }
+  input[readonly] { background: var(--readonly); color: var(--muted); }
   .pat-row { display: flex; gap: 6px; margin-bottom: 10px; }
   .pat-row input { margin-bottom: 0; flex: 1; min-width: 0; }
   .pat-row button { flex: none; }
-  .confirm-box { display: none; margin-top: 10px; padding: 10px; border: 1px solid #a5473b; border-radius: 10px; background: #fbf1ef; }
+  .confirm-box { display: none; margin-top: 10px; padding: 10px; border: 1px solid var(--bad); border-radius: 10px; background: var(--field); }
   .confirm-box.open { display: block; }
   .confirm-box p { margin: 0 0 8px; font-size: 0.9rem; }
   #wxHere { min-width: 0; }
@@ -53,10 +142,10 @@
   }
   .card {
     background: var(--card);
-    border-radius: 14px;
+    border-radius: var(--radius);
     padding: 16px;
     margin-bottom: 14px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    box-shadow: var(--shadow);
     border: 1px solid var(--border);
   }
 
@@ -150,7 +239,7 @@
     width: 100%;
     padding: 14px;
     background: var(--accent);
-    color: white;
+    color: var(--on-accent);
     border: none;
     border-radius: 12px;
     font-size: 1.05rem;
@@ -254,7 +343,8 @@
     z-index: 1;
   }
   .modal-close-btn {
-    background: #f1f0ec;
+    background: var(--accent-soft);
+    color: var(--text);
     border: none;
     font-size: 1.2rem;
     width: 36px;
@@ -278,7 +368,7 @@
     border-radius: 999px;
     font-size: 0.88rem;
   }
-  .seg-btn.on { background: var(--accent); color: #fff; }
+  .seg-btn.on { background: var(--accent); color: var(--on-accent); }
   .rv-week { margin-top: 10px; font-weight: 600; text-align: center; }
   .rv-sub { margin-top: 10px; color: var(--accent); }
   .rv-day { border-top: 1px solid var(--border); padding: 8px 0; }
@@ -308,8 +398,8 @@
     font-size: 0.82rem;
     color: var(--text);
   }
-  .rv-mark.on.good { background: #2e7d5b; border-color: #2e7d5b; color: #fff; }
-  .rv-mark.on.bad { background: #a5473b; border-color: #a5473b; color: #fff; }
+  .rv-mark.on.good { background: var(--good); border-color: var(--good); color: #fff; }
+  .rv-mark.on.bad { background: var(--bad); border-color: var(--bad); color: #fff; }
   .rv-cmp { margin-top: 10px; padding: 8px 10px; border-radius: 8px; background: var(--field); border: 1px solid var(--border); }
   .rv-cmp ul { margin: 4px 0 0; padding-left: 18px; font-size: 0.85rem; line-height: 1.6; }
   .word-list { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -341,8 +431,8 @@
   .gl-state.on { color: #fff; }
   .gl-state.on.s0 { background: #8a8a8a; border-color: #8a8a8a; }
   .gl-state.on.s1 { background: #c48a2c; border-color: #c48a2c; }
-  .gl-state.on.s2 { background: #2e7d5b; border-color: #2e7d5b; }
-  .gl-state.on.s3 { background: #a5473b; border-color: #a5473b; }
+  .gl-state.on.s2 { background: var(--good); border-color: var(--good); }
+  .gl-state.on.s3 { background: var(--bad); border-color: var(--bad); }
   .gl-del { flex: none; color: var(--muted); }
   /* 分析タブ */
   .an-word {
@@ -367,14 +457,14 @@
   .an-tbl th, .an-tbl td { border-top: 1px solid var(--border); padding: 7px 4px; vertical-align: top; text-align: left; word-break: break-all; }
   .an-tbl th { width: 26%; color: var(--muted); font-weight: 600; }
   .an-tbl thead th { border-top: none; }
-  .an-good { color: #2e7d5b; font-weight: 700; }
-  .an-bad { color: #a5473b; font-weight: 700; }
+  .an-good { color: var(--good); font-weight: 700; }
+  .an-bad { color: var(--bad); font-weight: 700; }
   .an-tbl details summary { color: var(--accent); }
   .status-line { text-align: center; padding: 10px; font-size: 0.9rem; color: var(--muted); min-height: 1.4em; }
 
   .close-settings {
     background: var(--accent);
-    color: white;
+    color: var(--on-accent);
     border: none;
     padding: 12px;
     border-radius: 10px;
@@ -677,6 +767,8 @@
 
 <div id="settings-panel">
   <div class="card">
+    <label class="field-label">見た目(押すとすぐ変わります)</label>
+    <div class="theme-list" id="themeList"></div>
     <label class="field-label">GitHub Personal Access Token</label>
     <div class="pat-row">
       <input type="password" id="patInput" placeholder="github_pat_..." autocomplete="off">

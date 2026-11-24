@@ -332,6 +332,32 @@
   .gl-state.on.s2 { background: #2e7d5b; border-color: #2e7d5b; }
   .gl-state.on.s3 { background: #a5473b; border-color: #a5473b; }
   .gl-del { flex: none; color: var(--muted); }
+  /* 分析タブ */
+  .an-word {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 5px 0;
+    border: none;
+    background: none;
+    color: var(--text);
+    font-size: 0.88rem;
+    text-align: left;
+  }
+  .an-rank { width: 22px; flex: none; color: var(--muted); font-size: 0.78rem; text-align: right; }
+  .an-w { width: 32%; flex: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .an-bar { flex: 1; height: 10px; background: var(--accent-soft); border-radius: 5px; overflow: hidden; }
+  .an-bar i { display: block; height: 100%; background: var(--accent); border-radius: 5px; }
+  .an-n { width: 40px; flex: none; text-align: right; font-size: 0.8rem; color: var(--muted); }
+  .an-word.on .an-w { font-weight: 700; color: var(--accent); }
+  .an-tbl { width: 100%; border-collapse: collapse; font-size: 0.84rem; table-layout: fixed; }
+  .an-tbl th, .an-tbl td { border-top: 1px solid var(--border); padding: 7px 4px; vertical-align: top; text-align: left; word-break: break-all; }
+  .an-tbl th { width: 26%; color: var(--muted); font-weight: 600; }
+  .an-tbl thead th { border-top: none; }
+  .an-good { color: #2e7d5b; font-weight: 700; }
+  .an-bad { color: #a5473b; font-weight: 700; }
+  .an-tbl details summary { color: var(--accent); }
   .status-line { text-align: center; padding: 10px; font-size: 0.9rem; color: var(--muted); min-height: 1.4em; }
 
   .close-settings {
@@ -397,7 +423,18 @@
       </div>
     </div>
 
+    <!-- 前の日の「試すこと」と、今週試すことのチェック(あるときだけ出す) -->
+    <div class="card" id="trialCheckCard" style="display:none;">
+      <label class="field-label">試すことはできた？(押したものだけ、この日記と一緒に残ります)</label>
+      <div id="trialCheckList"></div>
+    </div>
+
     <div class="card">
+      <label class="field-label">今日は動けた？</label>
+      <div class="seg" style="margin-bottom:12px;">
+        <button class="rv-mark" id="actGoodBtn">◯ 動けた</button>
+        <button class="rv-mark" id="actBadBtn">× 動けなかった</button>
+      </div>
       <label class="field-label">試すこと(1行。人に試して、結果を次の日記に書く)</label>
       <input type="text" id="trialInput" placeholder="例: 話を最後まで聞いてから答える" style="margin-bottom:12px;">
       <div class="condition-row">
@@ -496,6 +533,12 @@
       <div id="rvTrials"></div>
     </div>
 
+    <div class="card">
+      <label class="field-label">6. 次の週(<span id="rvNextWeekLabel"></span>)で試すこと</label>
+      <input type="text" id="rvNextTrial" placeholder="例: 頼みごとは断りやすい形で伝える" style="margin-bottom:0;">
+      <p class="hint" style="margin:8px 0 0;">次の週は毎日、日記を書くときに「できた/できなかった」をチェックします</p>
+    </div>
+
     <button class="save-btn" id="rvSaveBtn">振り返りを保存</button>
     <div id="rvStatus" class="status-line"></div>
 
@@ -549,8 +592,34 @@
     <button class="save-btn" id="glSaveBtn">目標を保存</button>
     <div id="glStatus" class="status-line"></div>
   </section>
+  <!-- ④ 分析タブ(よく出る言葉・動けた日と動けなかった日) -->
   <section class="tab-panel" id="tab-analysis">
-    <div class="card coming">分析タブは準備中です。<br>(伸ばす/維持/捨てる/今ではない、ギャップ分析)</div>
+    <div class="card">
+      <label class="field-label">分析する期間</label>
+      <div class="seg">
+        <button class="seg-btn" data-an-range="30">30日</button>
+        <button class="seg-btn" data-an-range="90">90日</button>
+        <button class="seg-btn" data-an-range="all">全期間</button>
+      </div>
+      <p class="hint" id="anInfo" style="margin:8px 0 0;"></p>
+    </div>
+
+    <div class="card">
+      <label class="field-label">1. よく出る言葉(何日に出たか。考え方の軸の候補)</label>
+      <div id="anWords"></div>
+      <div id="anWordDays"></div>
+    </div>
+
+    <div class="card">
+      <label class="field-label">2. 動けた日と動けなかった日を比べる</label>
+      <div class="seg" style="margin-bottom:10px;">
+        <button class="seg-btn" data-an-basis="act">動けた？</button>
+        <button class="seg-btn" data-an-basis="trial">試すこと</button>
+        <button class="seg-btn" data-an-basis="week">今週の試すこと</button>
+      </div>
+      <div id="anCompare"></div>
+      <p class="hint" style="margin:8px 0 0;">差が大きい項目が「動ける日の条件」の候補です</p>
+    </div>
   </section>
 
   <div id="browse-modal" class="modal-overlay">
@@ -614,5 +683,6 @@
 <script src="app.js"></script>
 <script src="review.js"></script>
 <script src="goal.js"></script>
+<script src="analysis.js"></script>
 </body>
 </html>

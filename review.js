@@ -55,6 +55,11 @@ function dayInfo(block) {
   const titles = block.lines.filter((l) => /^## \d{1,2}:\d{2} /.test(l)).map((l) => l.slice(3));
   // 古い形は、自由記述の最初の1行を代わりに使う
   const free = pick(/^- \(\d{1,2}:\d{2}\)(?: \[タグ:[^\]]*\])? (.+)$/m);
+  // 1日に何件も書いたときは、最後(一番新しい)の記録を使う
+  const last = (re) => {
+    const all = [...text.matchAll(re)];
+    return all.length ? all[all.length - 1][1].trim() : "";
+  };
   return {
     date: block.date,
     text,
@@ -65,6 +70,10 @@ function dayInfo(block) {
     weather: pick(/^- 天気:\s*([^\s(（]+)/m),
     moon: pick(/^- 月齢:\s*([\d.]+ [^(（\s]+)/m),
     trials: [...text.matchAll(/^- \*\*試すこと:\*\*\s*(.+)$/gm)].map((x) => x[1].trim()),
+    act: last(/行動:\s*(動けた|動けなかった)/g), // 日記の「今日は動けた？」
+    trialResult: last(/^- \*\*試すことの結果:\*\*\s*(できた|できなかった)/gm), // 前の日の試すこと
+    weekTrialResult: last(/^- \*\*今週試すことの結果:\*\*\s*(できた|できなかった)/gm),
+    maxTemp: pick(/^- 天気:.*?最高(-?[\d.]+)℃/m),
   };
 }
 
@@ -104,8 +113,8 @@ function countWords(texts) {
     // 書いた中身だけを数える(項目名・質問文・天気などの記録は除く)
     const body = t
       .split("\n")
-      .filter((l) => !/^\s*(# |---|タグ:|date:|links:|tags:|condition:|sleep:|- 天気:|- 月齢:|- 体調:|体調:)/.test(l))
-      .filter((l) => !l.includes("**Q:**") && !l.includes("**試すこと:**"))
+      .filter((l) => !/^\s*(# |---|タグ:|date:|links:|tags:|condition:|sleep:|- 天気:|- 月齢:|- 体調:|- 睡眠:|- 行動:|体調:)/.test(l))
+      .filter((l) => !l.includes("**Q:**") && !l.includes("**試すこと:**") && !l.includes("試すことの結果:**"))
       .filter((l) => !QUESTION_TEXTS.has(l.replace(/^\s*-\s*/, "").replace(/\s*\(\d{1,2}:\d{2}\)\s*$/, "").trim()))
       .map((l) => {
         if (!l.startsWith("## ")) return l;
@@ -130,7 +139,7 @@ function countWords(texts) {
 
 // ---------- 書きかけ(この端末だけ) ----------
 
-const REVIEW_FIELDS = ["rvEvent", "rvA", "rvB", "rvC", "rvD", "rvDiff", "rvRules"];
+const REVIEW_FIELDS = ["rvEvent", "rvA", "rvB", "rvC", "rvD", "rvDiff", "rvRules", "rvNextTrial"];
 
 function reviewDraftKey() {
   return REVIEW_DRAFT_PREFIX + reviewWeek.key;
@@ -170,6 +179,8 @@ async function openReviewTab(offset) {
   document.getElementById("rvPrevWeekBtn").classList.toggle("on", offset === -1);
   document.getElementById("rvThisWeekBtn").classList.toggle("on", offset === 0);
   document.getElementById("rvStatus").textContent = "";
+  document.getElementById("rvNextWeekLabel").textContent =
+    `${md(dateKey(dayAdd(reviewWeek.start, 7)))}〜${md(dateKey(dayAdd(reviewWeek.start, 13)))}`;
 
   const trialDraft = loadReviewDraft();
   const daysEl = document.getElementById("rvDays");
@@ -183,6 +194,10 @@ async function openReviewTab(offset) {
     const content = await loadDiary(true);
     reviewDays = daysInRange(content, reviewWeek.start, reviewWeek.end);
     reviewPrevTrials = daysInRange(content, dayAdd(reviewWeek.start, -7), dayAdd(reviewWeek.start, -1));
+    // 日記で「動けた/動けなかった」を押してある日は、最初からその印を付けておく
+    reviewDays.forEach((d) => {
+      if (!(d.date in reviewMarks) && d.act) reviewMarks[d.date] = d.act === "動けた" ? "good" : "bad";
+    });
     renderReviewDays();
     renderMarks();
     renderWords();
@@ -395,6 +410,10 @@ function buildReviewMarkdown() {
     "## 5. 試すことの結果",
     ...(trials.length ? trials : ["(なし)"]),
     "",
+    // 日記タブはこの見出しを探して「今週試すこと」を出す(見出しの文字は変えない)
+    "## 6. 次の週で試すこと",
+    v("rvNextTrial").replace(/\s*\n\s*/g, " ") || "(なし)",
+    "",
   ].join("\n");
 }
 
@@ -420,6 +439,8 @@ async function saveReview() {
     await githubPutFile(s, reviewPath(), text, sha, `review: ${reviewWeek.key}`);
     lsRemove(reviewDraftKey());
     status.textContent = "保存しました ✓(22時のClaudeのチェックで読まれます)";
+    if (typeof weekTrialCache !== "undefined") weekTrialCache = {}; // 日記タブの「今週試すこと」を読み直す
+    if (typeof loadTrialChecks === "function") loadTrialChecks();
     checkSavedReview();
   } catch (e) {
     status.textContent = "エラー: " + e.message + "(書いた内容は消えていません)";

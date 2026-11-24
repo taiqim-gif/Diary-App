@@ -540,6 +540,8 @@ const CSS = `
 .jw-tbl tbody th{ background:#FAF6EF; color:#6E675F; font-weight:400; width:26%; }
 .jw-tbl .jw-est{ display:block; font-size:11.5px; font-weight:700; }
 .jw-moonic{ vertical-align:-4px; margin-right:3px; }
+.jw-r1 .jw-moonic{ vertical-align:-3px; margin-right:1px; }
+.jw-sun{ color:#C48A2C; margin-right:1px; }
 .jw-sub{ font-size:12px; color:#6E675F; margin-top:12px; }
 .jw-moon{ display:flex; align-items:center; gap:14px; margin-top:12px; padding:10px 12px; border:1px solid #E6E0D6; border-radius:12px; background:#FBF9F5; }
 .jw-face{ flex:none; display:block; }
@@ -592,18 +594,24 @@ function mount(opts){
   sheet.hidden = true;
   document.body.appendChild(sheet);
 
-  let mode = 0;                                                // 0=アイコン 1=降水確率 2=気温
+  let mode = 0;                                                // 0=アイコン 1=降水確率 2=気温 3=月齢 4=日の出 5=日の入
+  const MODES = 6;
   function cols(){
     const d = load();
     if(!d || !d.weathers || !d.weathers.length) return null;
     return days(d, Date.now()).map(day => {
       const pv = (day.popsNow && day.popsNow[0]) ? parseFloat(day.popsNow[0].v) : day.pop;
-      return { icons: day.text ? iconsFromText(day.text, day.code) : "", pop: isFinite(pv) ? pv : null, max: day.max, min: day.min, label: dayLabel(day.key) };
+      return { icons: day.text ? iconsFromText(day.text, day.code) : "", pop: isFinite(pv) ? pv : null, max: day.max, min: day.min, label: dayLabel(day.key),
+        moon: day.moon, rise: day.rise, set: day.set };
     });
   }
   function cellHtml(c){
     if(mode === 0) return c.icons ? Array.from(c.icons).map(ch => `<span class="jw-ic" data-ic="${esc(ch)}">${esc(ch)}</span>`).join("") : "--";
     if(mode === 1) return c.pop != null ? `<span class="jw-pv ${c.pop >= 30 ? "wet" : "dry"}">${esc(c.pop)}<span class="jw-pc">%</span></span>` : "--";
+    // 月齢・日の出・日の入も、天気と同じように順番に出す(ヘッダーだけで分かるように)
+    if(mode === 3) return c.moon ? `${moonIcon(c.moon.elong, 15)}${esc(c.moon.age.toFixed(1))}` : "--";
+    if(mode === 4) return c.rise != null ? `<span class="jw-sun">↑</span>${esc(hmText(c.rise))}` : "--";
+    if(mode === 5) return c.set != null ? `<span class="jw-sun">↓</span>${esc(hmText(c.set))}` : "--";
     const t = v => v != null ? `<span style="color:${tempColor(v)}">${esc(v)}</span>` : "--";
     return `${t(c.max)}/${t(c.min)}`;
   }
@@ -617,10 +625,10 @@ function mount(opts){
     const g = btn.querySelector(".jw-grid");
     g.classList.toggle("icons", mode === 0);
     g.classList.toggle("pop", mode === 1);
-    g.classList.toggle("temp", mode === 2);
+    g.classList.toggle("temp", mode >= 2);
     if(flip && !reduced()){ g.classList.remove("flip"); void g.offsetWidth; g.classList.add("flip"); }
   }
-  function step(dir){ mode = ((mode + dir) % 3 + 3) % 3; render(true); }
+  function step(dir){ mode = ((mode + dir) % MODES + MODES) % MODES; render(true); }
   let timer = null;
   function restart(){
     clearInterval(timer);

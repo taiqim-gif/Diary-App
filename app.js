@@ -1,5 +1,5 @@
 // 日記×自己分析 - アプリ本体
-// ①日記タブ(天気・月齢つき)。振り返り・目標・分析タブはあとで作る
+// ①日記タブ(天気・月齢つき)。振り返りは review.js、目標は goal.js、分析は analysis.js
 const SETTINGS_KEY = "shinkaronDiarySettings";
 const BEING_KEY = "sdlBeing"; // ありたい姿(目標タブができるまで、この端末に保存)
 const DRAFT_KEY = "sdlDraft"; // 書きかけの日記(この端末だけ)
@@ -31,6 +31,10 @@ let viewCache = null; // GitHubから読んだ日記ファイル { content }
 let currentViewDate = null;
 let wx = null; // 天気の部品
 let timeTouched = false; // 日時を手で変えたか
+let dayAct = ""; // 今日は動けたか "動けた" / "動けなかった" / ""
+let trialChecks = {}; // 試すことのチェック 項目のキー → "できた" / "できなかった"
+let trialItems = []; // チェックする「試すこと」 [{ key, kind: "prev"|"week", date, text }]
+let weekTrialCache = {}; // 振り返りのキー → 次の週で試すこと(何度も読みに行かないように)
 
 // ---------- ユーティリティ ----------
 
@@ -151,7 +155,9 @@ function closeSettings() {
   document.getElementById("settings-panel").classList.remove("open");
   document.getElementById("main-panel").classList.remove("hidden");
   viewCache = null;
+  weekTrialCache = {};
   loadLookback();
+  loadTrialChecks();
   // 新しいトークンで、ありたい姿も読み直す(goal.js)
   if (typeof loadGoals === "function") loadGoals().catch(() => {});
 }
@@ -169,6 +175,8 @@ function showTab(name) {
   if (name === "review" && typeof openReviewTab === "function") openReviewTab();
   // 目標タブを開いたら、GitHubの目標を読み直す(goal.js)
   if (name === "goal" && typeof openGoalTab === "function") openGoalTab();
+  // 分析タブを開いたら、日記を読み直して数える(analysis.js)
+  if (name === "analysis" && typeof openAnalysisTab === "function") openAnalysisTab();
 }
 
 // ---------- ありたい姿と今日の行動方針 ----------
@@ -258,6 +266,8 @@ function saveDraft() {
     trial: document.getElementById("trialInput").value,
     condition: document.getElementById("conditionSelect").value,
     sleep: document.getElementById("sleepInput").value,
+    act: dayAct,
+    checks: trialChecks,
     hint,
   };
   lsSet(DRAFT_KEY, JSON.stringify(draft));
@@ -277,6 +287,8 @@ function restoreDraft() {
   document.getElementById("trialInput").value = d.trial || "";
   document.getElementById("conditionSelect").value = d.condition || "";
   document.getElementById("sleepInput").value = d.sleep || "";
+  dayAct = d.act || "";
+  trialChecks = d.checks || {};
   if (d.hint && d.hint.text) hint = d.hint;
   return true;
 }
@@ -286,9 +298,141 @@ function clearForm() {
     document.getElementById(id).value = "";
   });
   document.getElementById("conditionSelect").value = "";
+  dayAct = "";
+  trialChecks = {};
+  renderActButtons();
   lsRemove(DRAFT_KEY);
   timeTouched = false;
   document.getElementById("whenInput").value = localDateTimeValue(new Date());
+}
+
+// ---------- 今日は動けた？ ----------
+
+function renderActButtons() {
+  const g = document.getElementById("actGoodBtn");
+  const b = document.getElementById("actBadBtn");
+  g.className = "rv-mark" + (dayAct === "動けた" ? " on good" : "");
+  b.className = "rv-mark" + (dayAct === "動けなかった" ? " on bad" : "");
+}
+
+function setAct(v) {
+  dayAct = dayAct === v ? "" : v; // もう一度押すと取り消し
+  renderActButtons();
+  saveDraft();
+}
+
+// ---------- 試すことのチェック(前の日の分と、今週の分) ----------
+
+// "2026-11-25" から n 日ずらした日付
+function addDays(dateStr, n) {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return dateKey(new Date(y, m - 1, d + n));
+}
+
+// 入力欄の日時から、日記の日付を出す
+function entryDate() {
+  const when = new Date(document.getElementById("whenInput").value);
+  return isNaN(when.getTime()) ? todayStr() : dateKey(when);
+}
+
+// 振り返りの「## 6. 次の週で試すこと」の中身を取り出す
+function parseNextTrial(text) {
+  const m = (text || "").replace(/\r\n/g, "\n").match(/^## 6\. 次の週で試すこと\n([\s\S]*?)(?=\n## |$)/m);
+  if (!m) return "";
+  const line = m[1].split("\n").map((l) => l.trim()).find((l) => l);
+  return line && line !== "(なし)" ? line : "";
+}
+
+async function loadTrialChecks() {
+  const card = document.getElementById("trialCheckCard");
+  const settings = loadSettings();
+  if (!hasSettings(settings)) {
+    card.style.display = "none";
+    return;
+  }
+  try {
+    const content = await loadDiary(false);
+    const dateStr = entryDate();
+    const blocks = parseDayBlocks(content).blocks;
+    const items = [];
+
+    // 前の日の「試すこと」(この日より前で、試すことがある一番新しい日。7日前まで)
+    const prev = blocks
+      .filter((b) => b.date < dateStr && b.date >= addDays(dateStr, -7))
+      .sort((a, b) => (a.date < b.date ? 1 : -1))
+      .find((b) => /^- \*\*試すこと:\*\*/m.test(b.lines.join("\n")));
+    if (prev) {
+      [...prev.lines.join("\n").matchAll(/^- \*\*試すこと:\*\*\s*(.+)$/gm)].forEach((x, i) => {
+        items.push({ key: `p#${prev.date}#${i}`, kind: "prev", date: prev.date, text: x[1].trim() });
+      });
+    }
+
+    // 今週試すこと(前の週の振り返りで決めたもの)
+    if (typeof isoWeekKey === "function") {
+      const [y, m, d] = dateStr.split("-").map(Number);
+      const key = isoWeekKey(new Date(y, m - 1, d - 7));
+      if (!(key in weekTrialCache)) {
+        const { content: rv } = await githubGetFile(settings, `analysis/review/${key}.md`);
+        weekTrialCache[key] = parseNextTrial(rv);
+      }
+      if (weekTrialCache[key]) items.push({ key: `w#${key}`, kind: "week", date: key, text: weekTrialCache[key] });
+    }
+
+    trialItems = items;
+    renderTrialChecks(blocks.find((b) => b.date === dateStr));
+  } catch (e) {
+    console.error(e);
+    card.style.display = "none";
+  }
+}
+
+function renderTrialChecks(todayBlock) {
+  const card = document.getElementById("trialCheckCard");
+  const list = document.getElementById("trialCheckList");
+  list.innerHTML = "";
+  card.style.display = trialItems.length ? "block" : "none";
+  const todayText = todayBlock ? todayBlock.lines.join("\n") : "";
+  trialItems.forEach((it) => {
+    const box = document.createElement("div");
+    box.className = "rv-trial";
+    const label = it.kind === "week" ? "今週試すこと" : `${it.date.slice(5).replace("-", "/")} の試すこと`;
+    // この日にもう記録してあれば、それも見せる
+    const done = todayText
+      .split("\n")
+      .find((l) => l.includes("試すことの結果:**") && l.includes(`「${it.text}」`));
+    const doneNote = done ? `<div class="snippet">この日は記録済み: ${escapeHtml(done.includes("できなかった") ? "できなかった" : "できた")}</div>` : "";
+    box.innerHTML = `<div><span class="cat-label">${escapeHtml(label)}</span> ${escapeHtml(it.text)}</div>${doneNote}`;
+    const row = document.createElement("div");
+    row.className = "seg";
+    row.style.marginTop = "6px";
+    [
+      ["できた", "good", "◯ できた"],
+      ["できなかった", "bad", "× できなかった"],
+    ].forEach(([v, cls, text]) => {
+      const b = document.createElement("button");
+      b.className = "rv-mark" + (trialChecks[it.key] === v ? " on " + cls : "");
+      b.textContent = text;
+      b.addEventListener("click", () => {
+        trialChecks[it.key] = trialChecks[it.key] === v ? "" : v;
+        saveDraft();
+        renderTrialChecks(todayBlock);
+      });
+      row.appendChild(b);
+    });
+    box.appendChild(row);
+    list.appendChild(box);
+  });
+}
+
+// 保存する日記に書く、チェックの結果の行
+function trialResultLines() {
+  return trialItems
+    .filter((it) => trialChecks[it.key])
+    .map((it) =>
+      it.kind === "week"
+        ? `- **今週試すことの結果:** ${trialChecks[it.key]}(「${it.text}」)`
+        : `- **試すことの結果:** ${trialChecks[it.key]}(${it.date}「${it.text}」)`
+    );
 }
 
 // ---------- 天気と月齢 ----------
@@ -561,7 +705,8 @@ async function handleSave() {
   const condition = document.getElementById("conditionSelect").value;
   const sleep = document.getElementById("sleepInput").value;
 
-  if (!title && !body && !answer && !trial) {
+  const results = trialResultLines();
+  if (!title && !body && !answer && !trial && !dayAct && !results.length) {
     setStatus("入力がありません");
     return;
   }
@@ -579,10 +724,11 @@ async function handleSave() {
   try {
     // 1件分の中身を組み立てる
     const meta = weatherLines(dateStr);
-    if (condition || sleep) {
+    if (condition || sleep || dayAct) {
       const parts = [];
       if (condition) parts.push(`体調: ${condition}`);
       if (sleep) parts.push(`睡眠: ${sleep}時間`);
+      if (dayAct) parts.push(`行動: ${dayAct}`);
       meta.push(`- ${parts.join("　")}`);
     }
     const chunks = [];
@@ -592,6 +738,7 @@ async function handleSave() {
       const a = answer.split("\n").join("\n    ");
       chunks.push(`- **Q:** ${hint.text}\n  - ${a}`);
     }
+    if (results.length) chunks.push(results.join("\n"));
     if (trial) chunks.push(`- **試すこと:** ${trial}`);
     const heading = `${hm} ${title || "(タイトルなし)"}`;
     const entry = chunks.join("\n\n");
@@ -609,6 +756,7 @@ async function handleSave() {
     clearForm();
     nextHint();
     loadLookback();
+    loadTrialChecks();
   } catch (e) {
     console.error(e);
     setStatus("エラー: " + e.message + "(書いた内容は消えていません)");
@@ -846,7 +994,10 @@ on("cancelEditBtn", "click", cancelEditEntry);
 on("saveEditBtn", "click", saveEditEntry);
 on("whenInput", "change", () => {
   timeTouched = true;
+  loadTrialChecks(); // 日付を変えたら、その日の前の日の「試すこと」に変える
 });
+on("actGoodBtn", "click", () => setAct("動けた"));
+on("actBadBtn", "click", () => setAct("動けなかった"));
 ["titleInput", "bodyInput", "hintAnswer", "trialInput", "conditionSelect", "sleepInput"].forEach(
   (id) => on(id, "input", saveDraft)
 );
@@ -861,6 +1012,7 @@ document.getElementById("policyText").textContent = todayPolicy();
 renderBeing();
 if (!restoreDraft() || !hint) hint = pickHint();
 renderHint();
+renderActButtons();
 mountWeather();
 showTab("diary");
 
@@ -868,4 +1020,6 @@ if (!hasSettings(loadSettings())) {
   openSettings();
 } else {
   loadLookback();
+  // 振り返りの週の計算(review.js)を読み込んでから出す
+  window.addEventListener("load", loadTrialChecks);
 }

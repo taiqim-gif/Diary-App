@@ -674,7 +674,7 @@ function normalizeImportedDay(date, raw) {
 
 // 401/403 のときに、何をすればよいかを添える
 function authHint(status) {
-  if (status === 401) return "(トークンの期限切れか入力ミス。⚙️ で新しいトークンを入れてください)";
+  if (status === 401) return "(トークンの期限切れか入力ミス。「私の日記」を長押しして、新しいトークンを入れてください)";
   if (status === 403) return "(トークンの権限不足。Contents を Read and write にしてください)";
   return "";
 }
@@ -739,7 +739,7 @@ async function loadDiary(force) {
 async function handleSave() {
   const settings = loadSettings();
   if (!hasSettings(settings)) {
-    setStatus("先に設定(⚙️)を入力してください");
+    setStatus("先に設定(「私の日記」を長押し)を入力してください");
     openSettings();
     return;
   }
@@ -829,7 +829,7 @@ async function loadLookback() {
   document.getElementById("lookbackDate").textContent = target;
   btn.style.display = "none";
   if (!hasSettings(loadSettings())) {
-    box.textContent = "設定(⚙️)を入れると表示します";
+    box.textContent = "設定(「私の日記」を長押し)を入れると表示します";
     return;
   }
   box.textContent = "読み込み中...";
@@ -856,7 +856,7 @@ async function runSearch() {
   out.innerHTML = "";
   if (!q) return;
   if (!hasSettings(loadSettings())) {
-    out.textContent = "先に設定(⚙️)を入力してください";
+    out.textContent = "先に設定(「私の日記」を長押し)を入力してください";
     return;
   }
   out.textContent = "検索中...";
@@ -903,7 +903,7 @@ function openViewModalShell() {
 
 async function openViewModal() {
   if (!hasSettings(loadSettings())) {
-    setStatus("先に設定(⚙️)を入力してください");
+    setStatus("先に設定(「私の日記」を長押し)を入力してください");
     openSettings();
     return;
   }
@@ -1018,7 +1018,18 @@ function on(id, ev, fn) {
 document.querySelectorAll(".tab-btn").forEach((b) => {
   b.addEventListener("click", () => showTab(b.dataset.tab));
 });
-on("gearBtn", "click", openSettings);
+// 「私の日記」を長押し(0.7秒)すると設定を開く
+(function () {
+  const t = document.querySelector(".title-box");
+  let timer = null;
+  const cancel = () => clearTimeout(timer);
+  t.addEventListener("pointerdown", () => {
+    cancel();
+    timer = setTimeout(openSettings, 700);
+  });
+  ["pointerup", "pointerleave", "pointercancel"].forEach((ev) => t.addEventListener(ev, cancel));
+  t.addEventListener("contextmenu", (e) => e.preventDefault()); // 長押しのメニューを出さない
+})();
 on("saveSettingsBtn", "click", closeSettings);
 on("patShowBtn", "click", () => setPatVisible(document.getElementById("patInput").type === "password"));
 on("patCopyBtn", "click", copyPat);
@@ -1056,12 +1067,12 @@ on("actBadBtn", "click", () => setAct("動けなかった"));
   (id) => on(id, "input", saveDraft)
 );
 
-// タイトルの下に「2026年11月 霜月」(西暦の年月と、和風月名)
+// タイトルの下に「2026年11月(霜月)」(西暦の年月と、和風月名)
 const WAFU_MONTHS = ["睦月", "如月", "弥生", "卯月", "皐月", "水無月", "文月", "葉月", "長月", "神無月", "霜月", "師走"];
 function renderHeadDate() {
   const d = new Date();
   document.getElementById("headDate").textContent =
-    `${d.getFullYear()}年${d.getMonth() + 1}月 ${WAFU_MONTHS[d.getMonth()]}`;
+    `${d.getFullYear()}年${d.getMonth() + 1}月(${WAFU_MONTHS[d.getMonth()]})`;
 }
 renderHeadDate();
 

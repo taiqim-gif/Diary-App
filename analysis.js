@@ -26,7 +26,7 @@ async function openAnalysisTab() {
   document.querySelectorAll("[data-an-basis]").forEach((b) => b.classList.toggle("on", b.dataset.anBasis === anBasis));
   const info = document.getElementById("anInfo");
   if (!hasSettings(loadSettings())) {
-    info.textContent = "先に設定(⚙️)を入力してください";
+    info.textContent = "先に設定(「私の日記」を長押し)を入力してください";
     return;
   }
   info.textContent = "読み込み中...";

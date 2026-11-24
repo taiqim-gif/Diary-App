@@ -523,7 +523,9 @@ const CSS = `
 .jw-r1{ color:#0B7A7A; font-size:17px; font-weight:700; white-space:pre; overflow:hidden; line-height:20px; height:38px; display:flex; align-items:center; justify-content:center; }
 .jw-grid.icons .jw-r1{ font-size:19px; }
 .jw-grid.temp .jw-r1{ font-size:14.5px; }
-.jw-grid.sun .jw-r1{ font-size:13px; line-height:17px; }
+.jw-grid.sun .jw-r1{ font-size:17px; }
+.jw-grid.sun .jw-r2{ display:flex; }
+.jw-half{ flex:1; text-align:center; }
 .jw-ic[data-ic="☀"]{ color:#E8890C; } .jw-ic[data-ic="☁"]{ color:#7D8A96; } .jw-ic[data-ic="☂"]{ color:#1F6FD1; }
 .jw-ic[data-ic="❄"]{ color:#2A9FD6; } .jw-ic[data-ic="⚡"]{ color:#C99700; }
 .jw-pc{ font-size:13px; } .jw-pv.dry{ font-size:12px; } .jw-pv.dry .jw-pc{ font-size:11px; }
@@ -600,7 +602,7 @@ function mount(opts){
   sheet.hidden = true;
   document.body.appendChild(sheet);
 
-  let mode = 0;                                                // 0=アイコン 1=降水確率 2=気温 3=月齢 4=日の出・日の入(2段)
+  let mode = 0;                                                // 0=アイコン 1=降水確率 2=気温 3=月齢 4=日の出・日の入(3日の平均)
   const MODES = 5;
   function cols(){
     const d = load();
@@ -616,17 +618,37 @@ function mount(opts){
     if(mode === 1) return c.pop != null ? `<span class="jw-pv ${c.pop >= 30 ? "wet" : "dry"}">${esc(c.pop)}<span class="jw-pc">%</span></span>` : "--";
     // 月齢・日の出・日の入も、天気と同じように順番に出す(ヘッダーだけで分かるように)
     if(mode === 3) return c.moon ? `${moonIcon(c.moon.elong, 15)}${esc(c.moon.age.toFixed(1))}` : "--";
-    if(mode === 4) return c.rise != null && c.set != null
-      ? `<span><span class="jw-sun">↑</span>${esc(hmText(c.rise))}<br><span class="jw-sun">↓</span>${esc(hmText(c.set))}</span>` : "--";   // 上=日の出、下=日の入
     const t = v => v != null ? `<span style="color:${tempColor(v)}">${esc(v)}</span>` : "--";
     return `${t(c.max)}/${t(c.min)}`;
+  }
+  // 日の出・日の入は3日分の平均を1つだけ出す。矢印は、今日から明後日にかけて早くなる(←)か遅くなる(→)か
+  function sunHtml(cs){
+    const avg = a => a.reduce((x, y) => x + y, 0) / a.length;
+    const one = (key, arrowLeft) => {
+      const v = cs.map(c => c[key]).filter(x => x != null && isFinite(x));
+      if(!v.length) return "--";
+      const diff = v[v.length - 1] - v[0], ar = diff < 0 ? "←" : diff > 0 ? "→" : "";
+      const a = ar ? `<span class="jw-sun">${ar}</span>` : "";
+      return arrowLeft ? `${a}${esc(hmText(avg(v)))}` : `${esc(hmText(avg(v)))}${a}`;
+    };
+    return `<span class="jw-half">${one("rise", true)}</span><span class="jw-half">${one("set", false)}</span>`;
   }
   function render(flip){
     const cs = cols(), d = load();
     if(!cs){ btn.hidden = true; return; }
     btn.hidden = false;
-    btn.querySelectorAll(".jw-r1").forEach((el, i) => { el.innerHTML = cellHtml(cs[i]); });
-    btn.querySelectorAll(".jw-r2").forEach((el, i) => { el.textContent = cs[i].label; });
+    const sunMode = mode === 4;
+    btn.querySelectorAll(".jw-r1").forEach((el, i) => {
+      el.style.display = sunMode && i > 0 ? "none" : "";          // 日の出・日の入のときは、3列を1つにつなぐ
+      el.style.gridColumn = sunMode && i === 0 ? "1 / span 3" : "";
+      el.innerHTML = sunMode ? (i === 0 ? sunHtml(cs) : "") : cellHtml(cs[i]);
+    });
+    btn.querySelectorAll(".jw-r2").forEach((el, i) => {
+      el.style.display = sunMode && i > 0 ? "none" : "";
+      el.style.gridColumn = sunMode && i === 0 ? "1 / span 3" : "";
+      if(sunMode){ if(i === 0) el.innerHTML = '<span class="jw-half">日の出</span><span class="jw-half">日の入</span>'; }
+      else el.textContent = cs[i].label;
+    });
     btn.querySelector(".jw-stale").hidden = !(Date.now() - Date.parse(d.fetchedAt) > 3 * 3600 * 1000);   // 3時間より古いときは、先頭に「--」
     const g = btn.querySelector(".jw-grid");
     g.classList.toggle("icons", mode === 0);

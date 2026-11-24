@@ -101,7 +101,7 @@ async function openGoalTab() {
   status.textContent = "読み込み中...";
   try {
     if (!(await loadGoals())) {
-      status.textContent = "先に設定(⚙️)を入力してください";
+      status.textContent = "先に設定(「私の日記」を長押し)を入力してください";
       return;
     }
     renderGoalTab();
@@ -271,7 +271,7 @@ async function saveGoals() {
   const s = loadSettings();
   const status = document.getElementById("glStatus");
   if (!hasSettings(s) || !goalData) {
-    status.textContent = "先に設定(⚙️)を入力してください";
+    status.textContent = "先に設定(「私の日記」を長押し)を入力してください";
     return;
   }
   const btn = document.getElementById("glSaveBtn");

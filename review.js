@@ -186,7 +186,7 @@ async function openReviewTab(offset) {
   const daysEl = document.getElementById("rvDays");
 
   if (!hasSettings(loadSettings())) {
-    daysEl.textContent = "先に設定(⚙️)を入力してください";
+    daysEl.textContent = "先に設定(「私の日記」を長押し)を入力してください";
     return;
   }
   daysEl.textContent = "読み込み中...";
@@ -421,7 +421,7 @@ async function saveReview() {
   const s = loadSettings();
   const status = document.getElementById("rvStatus");
   if (!hasSettings(s)) {
-    status.textContent = "先に設定(⚙️)を入力してください";
+    status.textContent = "先に設定(「私の日記」を長押し)を入力してください";
     return;
   }
   const filled = REVIEW_FIELDS.some((id) => document.getElementById(id).value.trim());

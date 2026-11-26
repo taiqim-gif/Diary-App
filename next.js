@@ -79,8 +79,8 @@ function yearSteps(offset) {
 
 function patrolSteps() {
   return [
-    { text: "PCで Claude を起動する(Chrome付き: claude --chrome)" },
-    { text: "「規格外さん巡回」と頼む(noteとXの新しい投稿を読み、要点集を足す)" },
+    { text: "PCで Claude を起動する" },
+    { text: "「規格外さん巡回」と頼む(noteの新しい記事を読み、毎朝のXのメモ x-patrol/ と合わせて要点集に足す)" },
     { text: "要点集が更新されたのを確かめる" },
   ];
 }
@@ -128,13 +128,19 @@ async function collectNextTasks() {
   // GitHubの記録をまとめて読む(読めないものは「ない」として扱う)
   const thisWeek = weekInfo(0);
   const lastWeek = weekInfo(-1);
-  const [diary, goalsRaw, rvThis, rvLast, feedback] = await Promise.all([
+  const [diary, goalsRaw, rvThis, rvLast, feedback, xRaw] = await Promise.all([
     loadDiary(true).catch(() => null),
     githubGetFile(s, "analysis/goals.json").catch(() => ({ content: null })),
     githubGetFile(s, `analysis/review/${thisWeek.key}.md`).catch(() => ({ content: "x" })),
     githubGetFile(s, `analysis/review/${lastWeek.key}.md`).catch(() => ({ content: "x" })),
     githubListFolder(s, "feedback").catch(() => []),
+    githubGetFile(s, "x-patrol/state.json").catch(() => ({ content: null })),
   ]);
+  try {
+    xPatrol = xRaw.content ? JSON.parse(xRaw.content) : null;
+  } catch (e) {
+    xPatrol = null;
+  }
 
   // 1. 日記(昨日と今日。書いていない日)
   if (diary !== null) {
@@ -253,6 +259,22 @@ function nextScheduled(now = new Date()) {
   return list[0];
 }
 
+// X巡回(毎朝5件)の状態: 「X巡回(毎朝): 残り約6件以上・最終 11/27 6:52 ✓」
+let xPatrol = null;
+function xPatrolText() {
+  if (!xPatrol) return "";
+  const r = xPatrol.remaining_estimate;
+  const rest = r === null || r === undefined ? "残りは未確認" : r === 0 && !xPatrol.remaining_more ? "読み終わり" : `残り約${r}件${xPatrol.remaining_more ? "以上" : ""}`;
+  let last = "";
+  if (xPatrol.last_run) {
+    const d = new Date(xPatrol.last_run);
+    if (!isNaN(d)) last = `・最終 ${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${pad2(d.getMinutes())}`;
+  }
+  const st = String(xPatrol.last_status || "");
+  const mark = st.startsWith("ok") ? " ✓" : st ? ` ⚠ ${st}` : "";
+  return `X巡回(毎朝5件): ${rest}${last}${mark}`;
+}
+
 // 「次は 11/28(土) 週の振り返り」の文字を作る
 function nextScheduleText() {
   const n = nextScheduled();
@@ -270,7 +292,8 @@ function renderNext() {
     box.className = "card next-card none";
     box.innerHTML =
       `<div class="next-label">次にやること</div><div class="next-none">今はありません ✓</div>` +
-      `<div class="next-sched">${escapeHtml(nextScheduleText())}</div>`;
+      `<div class="next-sched">${escapeHtml(nextScheduleText())}</div>` +
+      (xPatrolText() ? `<div class="next-xp">${escapeHtml(xPatrolText())}</div>` : "");
     return;
   }
   const st = nextState();
@@ -309,6 +332,7 @@ function renderNext() {
   html += nextOpen
     ? `<button type="button" class="next-sched next-sched-in next-sched-btn" id="nextSchedBtn"><span>${escapeHtml(nextScheduleText())}</span><span class="next-close">▲ 閉じる</span></button>`
     : `<div class="next-sched next-sched-in">${escapeHtml(nextScheduleText())}</div>`;
+  if (xPatrolText()) html += `<div class="next-xp next-xp-in">${escapeHtml(xPatrolText())}</div>`;
   box.className = "card next-card";
   box.innerHTML = html;
 

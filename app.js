@@ -209,6 +209,14 @@ function closeSettings() {
   if (typeof loadGoals === "function") loadGoals().catch(() => {});
 }
 
+// 右上の ✕: 保存しないで閉じる(見た目と効果音は押した時点で変わっている)
+function closeSettingsNoSave() {
+  document.getElementById("settings-panel").classList.remove("open");
+  document.getElementById("main-panel").classList.remove("hidden");
+  setPatVisible(false);
+  if (settingsUnlocked && hasSettings(loadSettings())) setSettingsLock(false);
+}
+
 // ---------- タブ ----------
 
 function showTab(name) {
@@ -446,6 +454,7 @@ function renderTrialChecks(todayBlock) {
   const list = document.getElementById("trialCheckList");
   list.innerHTML = "";
   card.style.display = trialItems.length ? "block" : "none";
+  if (typeof renderGoalLinks === "function") renderGoalLinks();
   const todayText = todayBlock ? todayBlock.lines.join("\n") : "";
   trialItems.forEach((it) => {
     const box = document.createElement("div");
@@ -1056,6 +1065,7 @@ document.querySelectorAll(".tab-btn").forEach((b) => {
   t.addEventListener("contextmenu", (e) => e.preventDefault()); // 長押しのメニューを出さない
 })();
 on("saveSettingsBtn", "click", closeSettings);
+on("closeSettingsXBtn", "click", closeSettingsNoSave);
 on("patShowBtn", "click", () => setPatVisible(document.getElementById("patInput").type === "password"));
 on("patCopyBtn", "click", copyPat);
 on("unlockSettingsBtn", "click", () => document.getElementById("unlockConfirm").classList.add("open"));
@@ -1124,8 +1134,8 @@ function seasonColor() {
 function themeList() {
   const s = seasonColor();
   return [
-    ["blue", "標準・藍ブルー", "#2b4c8c"],
-    ["green", "標準・グリーン", "#2e6b4f"],
+    ["blue", "ロイヤルブルー", "#3058d0"],
+    ["green", "パステルグリーン", "#336b4c"],
     ["wa", "和風(藍・朱)", "linear-gradient(135deg, #264e70 50%, #c0462b 50%)"],
     ["night", "夜", "linear-gradient(135deg, #0e1524 50%, #d9b86a 50%)"],
     ["season", `季節で自動(今月: ${s[0]})`, s[1]],

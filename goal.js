@@ -93,6 +93,7 @@ async function loadGoals() {
   }
   lsSet(BEING_KEY, goalData.being || "");
   renderBeing();
+  renderGoalLinks();
   return true;
 }
 
@@ -111,6 +112,59 @@ async function openGoalTab() {
   }
 }
 
+// ---------- つながり(ひとつ上の目標を、決める欄の上に出す) ----------
+// ありたい姿 → 年 → 月 → 週(次の週で試すこと) → 翌日(試すこと)
+
+function linkRow(label, text, emptyMsg) {
+  const body = text
+    ? `<span>${escapeHtml(text)}</span>`
+    : `<span class="gl-empty">${escapeHtml(emptyMsg)} <button type="button" data-open-goal="1">目標タブで決める</button></span>`;
+  return `<div class="gl-row"><span class="gl-k">${label}</span>${body}</div>`;
+}
+
+function monthGoalsText(key) {
+  const m = goalData && goalData.months[key];
+  const list = ((m && m.goals) || []).map((x) => String(x.text || "").trim()).filter(Boolean);
+  return list.join(" ／ ");
+}
+
+function yearGoalsText(key) {
+  const y = goalData && goalData.years[key];
+  return String((y && y.goals) || "").split("\n").map((x) => x.trim()).filter(Boolean).join(" ／ ");
+}
+
+function setLink(id, html) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.innerHTML = html;
+  el.querySelectorAll("[data-open-goal]").forEach((b) => b.addEventListener("click", () => showTab("goal")));
+}
+
+function renderGoalLinks() {
+  if (!goalData) return;
+  const nowKey = goalMonthKey(0);
+  const monthText = monthGoalsText(nowKey);
+  const head = (t) => `<div class="gl-h">${t}</div>`;
+
+  // 日記「明日へ」: 今月の目標と、今週試すこと
+  const week = (typeof trialItems !== "undefined" ? trialItems : []).find((x) => x.kind === "week");
+  let html = head("つながり(ここから決める)") + linkRow("今月", monthText, "今月の目標がまだありません。");
+  if (week) html += linkRow("今週", week.text, "");
+  setLink("linkDiary", html);
+
+  // 振り返り「次へ」: 今月の目標
+  setLink("linkReview", head("つながり(ここから決める)") + linkRow("今月", monthText, "今月の目標がまだありません。"));
+
+  // 目標「決める」: 選んでいる月の年の目標
+  const mKey = goalMonthKey();
+  const yKey = String(yearOf(mKey));
+  setLink("linkMonth", head("つながり(ここから決める)") + linkRow(`${yKey}年`, yearGoalsText(yKey), "年の目標がまだありません(下の「大きな目標」で決める)。").replace(/ <button[^>]*>目標タブで決める<\/button>/, ""));
+
+  // 目標「大きな目標」: ありたい姿
+  const being = String(goalData.being || "").trim();
+  setLink("linkYear", head("つながり(ここから決める)") + linkRow("ありたい姿", being, "ありたい姿がまだありません(下の「土台」で書く)。").replace(/ <button[^>]*>目標タブで決める<\/button>/, ""));
+}
+
 // ---------- 画面を作る ----------
 
 function renderGoalTab() {
@@ -123,6 +177,7 @@ function renderGoalTab() {
     : "";
   renderGoalYear();
   renderGoalMonth();
+  renderGoalLinks();
 }
 
 function renderGoalYear() {
@@ -138,6 +193,7 @@ function renderGoalYear() {
 
 function renderGoalMonth() {
   if (!goalData) return;
+  queueMicrotask(renderGoalLinks); // 月を切り替えたら、上の「つながり」(その年の目標)も直す
   const key = goalMonthKey();
   [-1, 0, 1].forEach((o, i) =>
     document.getElementById(["glPrevMonthBtn", "glThisMonthBtn", "glNextMonthBtn"][i]).classList.toggle("on", goalMonthOffset === o)

@@ -11,18 +11,18 @@
 </script>
 <style>
   /* 見た目(テーマ)。設定画面で切り替え、<html data-theme="..."> で色を差し替える */
-  /* 標準・藍ブルー(いつもの見た目) */
+  /* 標準・ロイヤルブルー(いつもの見た目) */
   :root {
-    --bg: #a9c2e8;
+    --bg: #bccaf0;
     --card: #ffffff;
-    --accent: #1f3f80;
-    --accent-soft: #cddaf0;
+    --accent: #3058d0;
+    --accent-soft: #dde5fa;
     --on-accent: #ffffff;
     --text: #141820;
     --muted: #5b6474;
-    --border: #8fa9d4;
-    --field: #f7f9fc;
-    --readonly: #e3e9f2;
+    --border: #90a5e6;
+    --field: #f7f9fe;
+    --readonly: #e4e9f7;
     --good: #2e7d5b;
     --bad: #a5473b;
     --radius: 14px;
@@ -30,13 +30,15 @@
     --head-font: inherit;
     color-scheme: light;
   }
-  /* 標準・グリーン */
+  /* 標準・パステルグリーン(目にやさしい護眼色をもとに) */
   :root[data-theme="green"] {
-    --bg: #a6d3b6;
-    --accent: #1e5c3f;
-    --accent-soft: #c6e0cf;
-    --border: #82b893;
-    --readonly: #e0eee4;
+    --bg: #bfe4c6;
+    --card: #f3faf4;
+    --accent: #336b4c;
+    --accent-soft: #e0f3e4;
+    --border: #99cfa5;
+    --field: #fbfefb;
+    --readonly: #e3f1e6;
   }
   /* 和風: 生成りの紙に、藍・朱・抹茶 */
   :root[data-theme="wa"] {
@@ -84,7 +86,7 @@
   body .jw-sub, body .jw-note, body .jw-moon .jw-np { font-size: 13.5px; }
   body {
     margin: 0;
-    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
+    font-family: "Noto Sans JP", -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
     background: var(--bg);
     color: var(--text);
     padding: env(safe-area-inset-top) 16px env(safe-area-inset-bottom);
@@ -172,7 +174,7 @@
     background: var(--accent); color: var(--on-accent); border: none;
     padding: 10px 14px; text-align: left; font: inherit; cursor: pointer;
   }
-  .next-head .next-label { color: var(--on-accent); opacity: 0.9; }
+  .next-head .next-label { color: var(--on-accent); }
   .next-label { font-size: 0.72rem; font-weight: 700; color: var(--accent); display: flex; justify-content: space-between; }
   .next-rest { font-weight: 600; }
   .next-title { font-size: 1.05rem; font-weight: 800; }
@@ -197,12 +199,17 @@
   .next-steps li { margin-bottom: 8px; line-height: 1.5; }
   .next-steps li.done { color: var(--muted); list-style: none; margin-left: -18px; }
   .next-steps li.cur { font-weight: 700; }
-  .next-btns { display: flex; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
+  .next-btns { display: flex; gap: 8px; margin-top: 6px; flex-wrap: nowrap; }
+  .next-btns button { flex: 1; min-width: 0; padding-left: 6px; padding-right: 6px; }
   .next-btns button, .next-back {
     font: inherit; font-size: 0.9rem; border-radius: 10px; padding: 7px 14px; cursor: pointer;
   }
   .next-ok { background: var(--good); color: #fff; border: none; font-weight: 700; }
   .next-act { background: var(--card); color: var(--accent); border: 2px solid var(--accent); font-weight: 700; }
+  .next-queue { margin: 0 14px 10px; padding-top: 8px; border-top: 1px dashed var(--border); }
+  .next-queue-h { font-size: 0.75rem; font-weight: 700; color: var(--muted); margin-bottom: 4px; }
+  .next-queue ul { margin: 0; padding: 0; list-style: none; }
+  .next-queue li { font-size: 0.88rem; margin: 3px 0; }
   .next-left { font-size: 0.8rem; color: var(--muted); padding: 0 14px 6px; }
   .next-back { background: none; border: 1px solid var(--border); color: var(--muted); margin: 0 14px 10px; font-size: 0.8rem; padding: 4px 10px; }
 
@@ -259,13 +266,14 @@
     white-space: nowrap;
     font-weight: 600;
     color: var(--on-accent);
-    opacity: 0.85;
+    opacity: 1; /* 透けさせない(白抜き文字をくっきり) */
+    text-shadow: 0 1px 1px rgba(0,0,0,0.25);
   }
   /* 選んでいるタブは白く抜いて、文字を濃い色に */
-  .tab-btn.active { background: var(--card); color: var(--accent); font-weight: 800; opacity: 1; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+  .tab-btn.active { background: var(--card); color: var(--accent); font-weight: 800; opacity: 1; text-shadow: none; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
   /* 流れのタブ: 上に間隔(①毎日など)、下に名前。タブの間に「›」で順番を見せる */
-  .tab-freq { font-size: 0.8em; font-weight: 600; opacity: 0.9; }
-  .tab-name { font-size: 1em; }
+  .tab-freq { font-size: 0.82em; font-weight: 700; }
+  .tab-name { font-size: 1em; font-weight: 800; }
   .tab-btn:not(:last-child)::after {
     content: "›";
     position: absolute;
@@ -313,6 +321,26 @@
     place-items: center;
     font-size: 0.9rem;
   }
+  /* つながり: 決める欄の上に、ひとつ上の目標を小さく出す */
+  .goal-link {
+    margin: 0 0 10px;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--accent);
+    border-radius: 8px;
+    background: var(--accent-soft);
+    font-size: 0.85rem;
+    line-height: 1.5;
+  }
+  .goal-link:empty { display: none; }
+  .goal-link .gl-h { font-size: 0.72rem; font-weight: 700; color: var(--accent); }
+  .goal-link .gl-row { display: flex; gap: 6px; }
+  .goal-link .gl-k { flex: none; font-weight: 700; color: var(--accent); }
+  .goal-link .gl-empty { color: var(--muted); }
+  .goal-link button { font: inherit; font-size: 0.8rem; border: none; background: none; color: var(--accent); text-decoration: underline; padding: 0; cursor: pointer; }
+  /* 設定画面の見出しと閉じるボタン */
+  .settings-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .settings-head strong { font-size: 1.05rem; }
   .tab-panel { display: none; }
   .tab-panel.active { display: block; }
   .coming { text-align: center; color: var(--muted); padding: 30px 10px; line-height: 1.7; }
@@ -611,6 +639,9 @@
     font-size: 1rem;
   }
 </style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;800&display=swap">
 </head>
 <body>
 
@@ -713,6 +744,7 @@
 
     <div class="card">
       <div class="step-head">明日へ</div>
+      <div class="goal-link" id="linkDiary"></div>
       <label class="field-label">試すこと(1行。人に試して、結果を次の日記に書く)</label>
       <input type="text" id="trialInput" placeholder="例: 話を最後まで聞いてから答える" style="margin-bottom:0;">
       <p class="hint" style="margin:10px 0 0;">保存すると、天気・気温・月齢も一緒に残ります</p>
@@ -798,6 +830,7 @@
 
     <div class="card">
       <div class="step-head">次へ</div>
+      <div class="goal-link" id="linkReview"></div>
       <label class="field-label">次の週(<span id="rvNextWeekLabel"></span>)で試すこと</label>
       <input type="text" id="rvNextTrial" placeholder="例: 頼みごとは断りやすい形で伝える" style="margin-bottom:0;">
       <p class="hint" style="margin:8px 0 0;">次の週は毎日、日記を書くときに「できた/できなかった」をチェックします</p>
@@ -835,6 +868,7 @@
 
     <div class="card">
       <div class="step-head">決める</div>
+      <div class="goal-link" id="linkMonth"></div>
       <label class="field-label">月の目標と進み具合 <span id="glMonthSummary" class="snippet"></span></label>
       <div id="glMonthGoals"></div>
       <div style="display:flex; gap:8px; flex-wrap:wrap;">
@@ -845,6 +879,7 @@
 
     <div class="card">
       <div class="step-head">大きな目標</div>
+      <div class="goal-link" id="linkYear"></div>
       <div class="seg" style="margin-bottom:8px;">
         <button class="seg-btn" id="glThisYearBtn">今年</button>
         <button class="seg-btn" id="glNextYearBtn">来年</button>
@@ -947,6 +982,10 @@
 
 <div id="settings-panel">
   <div class="card">
+    <div class="settings-head">
+      <strong>設定</strong>
+      <button class="modal-close-btn" id="closeSettingsXBtn" aria-label="設定を閉じる">✕</button>
+    </div>
     <label class="field-label">見た目(押すとすぐ変わります)</label>
     <div class="theme-list" id="themeList"></div>
     <label class="field-label">効果音(iPhoneはマナーモード中は鳴りません)</label>
@@ -982,13 +1021,13 @@
   </div>
 </div>
 
-<script src="questions.js?v=20261126b"></script>
-<script src="jma-weather.js?v=20261126b"></script>
-<script src="app.js?v=20261126b"></script>
-<script src="review.js?v=20261126b"></script>
-<script src="goal.js?v=20261126b"></script>
-<script src="analysis.js?v=20261126b"></script>
-<script src="next.js?v=20261126b"></script>
-<script src="sound.js?v=20261126b"></script>
+<script src="questions.js?v=20261126c"></script>
+<script src="jma-weather.js?v=20261126c"></script>
+<script src="app.js?v=20261126c"></script>
+<script src="review.js?v=20261126c"></script>
+<script src="goal.js?v=20261126c"></script>
+<script src="analysis.js?v=20261126c"></script>
+<script src="next.js?v=20261126c"></script>
+<script src="sound.js?v=20261126c"></script>
 </body>
 </html>

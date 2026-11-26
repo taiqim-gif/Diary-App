@@ -11,18 +11,18 @@
 </script>
 <style>
   /* 見た目(テーマ)。設定画面で切り替え、<html data-theme="..."> で色を差し替える */
-  /* 標準・ロイヤルブルー(いつもの見た目) */
+  /* 標準・深い藍(いつもの見た目) */
   :root {
-    --bg: #bccaf0;
+    --bg: #b4c8e2;
     --card: #ffffff;
-    --accent: #3058d0;
-    --accent-soft: #dde5fa;
+    --accent: #25467a;
+    --accent-soft: #d9e4f2;
     --on-accent: #ffffff;
     --text: #141820;
     --muted: #5b6474;
-    --border: #90a5e6;
-    --field: #f7f9fe;
-    --readonly: #e4e9f7;
+    --border: #8eaad0;
+    --field: #f7f9fc;
+    --readonly: #e3e9f2;
     --good: #2e7d5b;
     --bad: #a5473b;
     --radius: 14px;
@@ -211,6 +211,8 @@
   /* 次の予定(1行) */
   .next-sched { margin-top: 4px; font-size: 0.85rem; font-weight: 600; color: var(--accent); }
   .next-sched-in { margin: 0; padding: 6px 14px 8px; border-top: 1px dashed var(--border); }
+  .next-sched-btn { display: flex; justify-content: space-between; gap: 8px; width: 100%; background: none; border-left: none; border-right: none; border-bottom: none; font: inherit; font-size: 0.85rem; font-weight: 600; color: var(--accent); text-align: left; cursor: pointer; }
+  .next-close { flex: none; font-size: 0.8rem; }
   .next-steps { margin: 0; padding: 10px 14px 4px 34px; }
   .next-steps li { margin-bottom: 8px; line-height: 1.5; }
   .next-steps li.done { color: var(--muted); list-style: none; margin-left: -18px; }
@@ -1048,13 +1050,13 @@
   </div>
 </div>
 
-<script src="questions.js?v=20261126d"></script>
-<script src="jma-weather.js?v=20261126d"></script>
-<script src="app.js?v=20261126d"></script>
-<script src="review.js?v=20261126d"></script>
-<script src="goal.js?v=20261126d"></script>
-<script src="analysis.js?v=20261126d"></script>
-<script src="next.js?v=20261126d"></script>
-<script src="sound.js?v=20261126d"></script>
+<script src="questions.js?v=20261126e"></script>
+<script src="jma-weather.js?v=20261126e"></script>
+<script src="app.js?v=20261126e"></script>
+<script src="review.js?v=20261126e"></script>
+<script src="goal.js?v=20261126e"></script>
+<script src="analysis.js?v=20261126e"></script>
+<script src="next.js?v=20261126e"></script>
+<script src="sound.js?v=20261126e"></script>
 </body>
 </html>

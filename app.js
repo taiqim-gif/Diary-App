@@ -1136,7 +1136,7 @@ function seasonColor() {
 function themeList() {
   const s = seasonColor();
   return [
-    ["blue", "ロイヤルブルー", "#3058d0"],
+    ["blue", "深い藍", "#25467a"],
     ["green", "パステルグリーン", "#336b4c"],
     ["wa", "和風(藍・朱)", "linear-gradient(135deg, #264e70 50%, #c0462b 50%)"],
     ["night", "夜", "linear-gradient(135deg, #0e1524 50%, #d9b86a 50%)"],

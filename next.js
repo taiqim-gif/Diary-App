@@ -278,7 +278,7 @@ function renderNext() {
   const rest = nextTasks.length - 1;
   let html =
     `<button class="next-head" id="nextHeadBtn" aria-expanded="${nextOpen}">` +
-    `<span class="next-label">次にやること${rest ? `<span class="next-rest">このあと やること ${rest}つ</span>` : ""}</span>` +
+    `<span class="next-label">次にやること${rest ? `<span class="next-rest">次の次にやること(${rest}つ)</span>` : ""}</span>` +
     `<span class="next-title">${t.when ? `<span class="next-when">${escapeHtml(t.when)}</span>` : ""}${escapeHtml(t.title)}</span>` +
     `<span class="next-prog">手順 ${doneCount}/${t.steps.length}　${nextOpen ? "▲ とじる" : "▼ タップで手順"}</span>` +
     `</button>`;
@@ -297,21 +297,29 @@ function renderNext() {
     html += `</ol>`;
     if (left > 0) html += `<div class="next-left">このあと ${left} 手順</div>`;
     if (doneCount > 0) html += `<button class="next-back" id="nextBackBtn">1つ戻す</button>`;
-    // このあと やること(待っている作業の一覧)
+    // 次の次にやること(待っている作業の一覧)
     if (rest) {
-      html += `<div class="next-queue"><div class="next-queue-h">このあと やること</div><ul>`;
+      html += `<div class="next-queue"><div class="next-queue-h">次の次にやること(${rest}つ)</div><ul>`;
       nextTasks.slice(1).forEach((q) => {
         html += `<li>${q.when ? `<span class="next-when">${escapeHtml(q.when)}</span>` : ""}${escapeHtml(q.title)}</li>`;
       });
       html += `</ul></div>`;
     }
   }
-  html += `<div class="next-sched next-sched-in">${escapeHtml(nextScheduleText())}</div>`;
+  html += nextOpen
+    ? `<button type="button" class="next-sched next-sched-in next-sched-btn" id="nextSchedBtn"><span>${escapeHtml(nextScheduleText())}</span><span class="next-close">▲ 閉じる</span></button>`
+    : `<div class="next-sched next-sched-in">${escapeHtml(nextScheduleText())}</div>`;
   box.className = "card next-card";
   box.innerHTML = html;
 
   document.getElementById("nextHeadBtn").addEventListener("click", () => {
     nextOpen = !nextOpen;
+    renderNext();
+  });
+  // 一番下の「次の予定」を押しても閉じられる(上まで戻らなくてよい)
+  const schedBtn = document.getElementById("nextSchedBtn");
+  if (schedBtn) schedBtn.addEventListener("click", () => {
+    nextOpen = false;
     renderNext();
   });
   const cur = t.steps[doneCount];

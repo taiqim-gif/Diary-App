@@ -53,9 +53,10 @@
     --field: #fbfaf6;
     --readonly: #ece8de;
   }
-  :root[data-theme="colorful"][data-tab="review"] { --accent: #b8481a; --accent-soft: #f8e4da; }
-  :root[data-theme="colorful"][data-tab="goal"] { --accent: #25793f; --accent-soft: #dcefe2; }
-  :root[data-theme="colorful"][data-tab="analysis"] { --accent: #7b3d9b; --accent-soft: #eee2f4; }
+  /* タブより上(天気・ありたい姿・次にやること)は基本色の青のまま。タブの中だけ、そのタブの色にする */
+  :root[data-theme="colorful"] #tab-review { --accent: #b8481a; --accent-soft: #f8e4da; }
+  :root[data-theme="colorful"] #tab-goal { --accent: #25793f; --accent-soft: #dcefe2; }
+  :root[data-theme="colorful"] #tab-analysis { --accent: #7b3d9b; --accent-soft: #eee2f4; }
   /* 和風: 生成りの紙に、藍・朱・抹茶 */
   :root[data-theme="wa"] {
     --bg: #d2bb8c;
@@ -1050,13 +1051,13 @@
   </div>
 </div>
 
-<script src="questions.js?v=20261126e"></script>
-<script src="jma-weather.js?v=20261126e"></script>
-<script src="app.js?v=20261126e"></script>
-<script src="review.js?v=20261126e"></script>
-<script src="goal.js?v=20261126e"></script>
-<script src="analysis.js?v=20261126e"></script>
-<script src="next.js?v=20261126e"></script>
-<script src="sound.js?v=20261126e"></script>
+<script src="questions.js?v=20261126f"></script>
+<script src="jma-weather.js?v=20261126f"></script>
+<script src="app.js?v=20261126f"></script>
+<script src="review.js?v=20261126f"></script>
+<script src="goal.js?v=20261126f"></script>
+<script src="analysis.js?v=20261126f"></script>
+<script src="next.js?v=20261126f"></script>
+<script src="sound.js?v=20261126f"></script>
 </body>
 </html>

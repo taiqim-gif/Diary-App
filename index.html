@@ -220,7 +220,7 @@
   /* タブ */
   .tabs {
     display: flex;
-    gap: 4px;
+    gap: 14px; /* すき間に「›」の矢印を置く */
     margin-bottom: 14px;
     /* タブの帯は濃い色で、はっきり見えるように */
     background: var(--accent);
@@ -230,9 +230,15 @@
   }
   .tab-btn {
     flex: 1;
+    min-width: 0;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    line-height: 1.2;
     border: none;
     background: none;
-    padding: 10px 0;
+    padding: 6px 0 7px;
     border-radius: 9px;
     font-size: clamp(0.8rem, 4.3vw, 0.95rem); /* せまい画面でも「振り返り」が1行に入るように */
     white-space: nowrap;
@@ -242,6 +248,56 @@
   }
   /* 選んでいるタブは白く抜いて、文字を濃い色に */
   .tab-btn.active { background: var(--card); color: var(--accent); font-weight: 800; opacity: 1; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+  /* 流れのタブ: 上に間隔(①毎日など)、下に名前。タブの間に「›」で順番を見せる */
+  .tab-freq { font-size: 0.8em; font-weight: 600; opacity: 0.9; }
+  .tab-name { font-size: 1em; }
+  .tab-btn:not(:last-child)::after {
+    content: "›";
+    position: absolute;
+    right: -12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--on-accent);
+    font-size: 1.2rem;
+    font-weight: 800;
+    opacity: 0.9;
+    pointer-events: none;
+  }
+  /* このタブでやること(1行の案内) */
+  .tab-guide {
+    margin: 0 0 10px;
+    padding: 8px 12px;
+    border-left: 4px solid var(--accent);
+    background: var(--card);
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--accent);
+  }
+  /* 考える順の番号。隠れているカードは数えないので、番号は自動で詰まる */
+  .steps { counter-reset: step; }
+  .step-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 8px;
+    font-size: 1.05rem;
+    font-weight: 800;
+    color: var(--accent);
+  }
+  .step-head::before {
+    counter-increment: step;
+    content: counter(step);
+    flex: none;
+    width: 1.7em;
+    height: 1.7em;
+    border-radius: 50%;
+    background: var(--accent);
+    color: var(--on-accent);
+    display: grid;
+    place-items: center;
+    font-size: 0.9rem;
+  }
   .tab-panel { display: none; }
   .tab-panel.active { display: block; }
   .coming { text-align: center; color: var(--muted); padding: 30px 10px; line-height: 1.7; }
@@ -552,9 +608,6 @@
 </header>
 
 <div id="main-panel">
-  <!-- 次にやること(1つだけ出す。タップで手順を1つずつ。中身は next.js が作る) -->
-  <div class="card next-card none" id="nextCard"><div class="next-label">次にやること</div><div class="next-none">読み込み中...</div></div>
-
   <!-- ありたい姿と、規格外さんの今日の行動方針(いつも上に出す) -->
   <div class="card being-card">
     <div id="beingView" class="being-row">
@@ -570,16 +623,30 @@
     </div>
   </div>
 
+  <!-- 次にやること(1つだけ出す。タップで手順を1つずつ。中身は next.js が作る) -->
+  <div class="card next-card none" id="nextCard"><div class="next-label">次にやること</div><div class="next-none">読み込み中...</div></div>
+
+  <!-- 流れのタブ: ①日記 → ②振り返り → ③目標 → ④分析(上に使う間隔) -->
   <nav class="tabs">
-    <button class="tab-btn" data-tab="diary">日記</button>
-    <button class="tab-btn" data-tab="review">振り返り</button>
-    <button class="tab-btn" data-tab="goal">目標</button>
-    <button class="tab-btn" data-tab="analysis">分析</button>
+    <button class="tab-btn" data-tab="diary"><span class="tab-freq">①毎日</span><span class="tab-name">日記</span></button>
+    <button class="tab-btn" data-tab="review"><span class="tab-freq">②毎週</span><span class="tab-name">振り返り</span></button>
+    <button class="tab-btn" data-tab="goal"><span class="tab-freq">③毎月</span><span class="tab-name">目標</span></button>
+    <button class="tab-btn" data-tab="analysis"><span class="tab-freq">④随時</span><span class="tab-name">分析</span></button>
   </nav>
 
-  <!-- ① 日記タブ -->
-  <section class="tab-panel" id="tab-diary">
+  <!-- ① 日記タブ(考える順: 答え合わせ → 書く → 今日の自分 → 明日へ → 読み返す) -->
+  <section class="tab-panel steps" id="tab-diary">
+    <p class="tab-guide">このタブでやること:昨日を確かめて、今日を書き、明日へつなぐ</p>
+
+    <!-- 前の日の「試すこと」と、今週試すことのチェック(あるときだけ出す。ないときは番号も飛ばす) -->
+    <div class="card" id="trialCheckCard" style="display:none;">
+      <div class="step-head">答え合わせ</div>
+      <label class="field-label">試すことはできた？(押したものだけ、この日記と一緒に残ります)</label>
+      <div id="trialCheckList"></div>
+    </div>
+
     <div class="card">
+      <div class="step-head">書く</div>
       <label class="field-label">日時</label>
       <!-- 日付と時刻を分けて置く(1つの欄だとスマホで枠からはみ出すため)。保存に使うのは隠した whenInput -->
       <div class="when-row">
@@ -603,20 +670,13 @@
       </div>
     </div>
 
-    <!-- 前の日の「試すこと」と、今週試すことのチェック(あるときだけ出す) -->
-    <div class="card" id="trialCheckCard" style="display:none;">
-      <label class="field-label">試すことはできた？(押したものだけ、この日記と一緒に残ります)</label>
-      <div id="trialCheckList"></div>
-    </div>
-
     <div class="card">
+      <div class="step-head">今日の自分</div>
       <label class="field-label">今日は動けた？</label>
       <div class="seg" style="margin-bottom:12px;">
         <button class="rv-mark" id="actGoodBtn">◯ 動けた</button>
         <button class="rv-mark" id="actBadBtn">× 動けなかった</button>
       </div>
-      <label class="field-label">試すこと(1行。人に試して、結果を次の日記に書く)</label>
-      <input type="text" id="trialInput" placeholder="例: 話を最後まで聞いてから答える" style="margin-bottom:12px;">
       <div class="condition-row">
         <div class="condition-col">
           <label class="field-label">体調</label>
@@ -634,6 +694,12 @@
           <input type="number" id="sleepInput" step="0.5" min="0" max="24" placeholder="例: 6.5">
         </div>
       </div>
+    </div>
+
+    <div class="card">
+      <div class="step-head">明日へ</div>
+      <label class="field-label">試すこと(1行。人に試して、結果を次の日記に書く)</label>
+      <input type="text" id="trialInput" placeholder="例: 話を最後まで聞いてから答える" style="margin-bottom:0;">
       <p class="hint" style="margin:10px 0 0;">保存すると、天気・気温・月齢も一緒に残ります</p>
     </div>
 
@@ -641,6 +707,7 @@
     <div id="status"></div>
 
     <div class="card">
+      <div class="step-head">読み返す</div>
       <label class="field-label">1年前の今日(<span id="lookbackDate"></span>)</label>
       <div id="lookbackBody"></div>
       <button class="reroll" id="lookbackOpenBtn" style="display:none;">全部読む</button>
@@ -658,9 +725,10 @@
     <button class="add-question-btn" id="viewPastBtn">📖 日付から過去の日記を見る</button>
   </section>
 
-  <!-- ②〜④ はあとで作る -->
-  <!-- ② 振り返りタブ(週1回) -->
-  <section class="tab-panel" id="tab-review">
+  <!-- ② 振り返りタブ(週1回。考える順: 答え合わせ → 深める → 比べる → 見つける → 次へ → 読む) -->
+  <section class="tab-panel steps" id="tab-review">
+    <p class="tab-guide">このタブでやること:1週間の日記から学びを取り出し、次の週で試すことを決める</p>
+
     <div class="card">
       <div class="seg">
         <button class="seg-btn" id="rvPrevWeekBtn">先週</button>
@@ -672,13 +740,16 @@
     </div>
 
     <div class="card">
-      <label class="field-label">1. この週の日記から、出来事を1つ選ぶ</label>
-      <div id="rvDays"></div>
-      <input type="text" id="rvEvent" placeholder="選んだ出来事(押すと入ります。手で書いてもよい)" style="margin:10px 0 0;">
+      <div class="step-head">答え合わせ</div>
+      <label class="field-label">この週の「試すこと」の結果</label>
+      <div id="rvTrials"></div>
     </div>
 
     <div class="card">
-      <label class="field-label">2. 具体→本質→応用→教訓</label>
+      <div class="step-head">深める</div>
+      <label class="field-label">この週の日記から、出来事を1つ選ぶ</label>
+      <div id="rvDays"></div>
+      <input type="text" id="rvEvent" placeholder="選んだ出来事(押すと入ります。手で書いてもよい)" style="margin:10px 0 0;">
       <label class="field-label rv-sub">具体的な経験・出来事</label>
       <textarea id="rvA"></textarea>
       <label class="field-label rv-sub">そこから抽出した本質・法則</label>
@@ -690,7 +761,8 @@
     </div>
 
     <div class="card">
-      <label class="field-label">3. 動けた日・動けなかった日を見比べる</label>
+      <div class="step-head">比べる</div>
+      <label class="field-label">動けた日・動けなかった日を見比べる</label>
       <div id="rvMarks"></div>
       <div id="rvCompare"></div>
       <label class="field-label rv-sub">違い(誰に会い、何を読み、どんな予定だったか)</label>
@@ -698,7 +770,8 @@
     </div>
 
     <div class="card">
-      <label class="field-label">4. よく出る言葉 → 自分ルールの候補</label>
+      <div class="step-head">見つける</div>
+      <label class="field-label">よく出る言葉 → 自分ルールの候補</label>
       <div class="seg" style="margin-bottom:8px;">
         <button class="seg-btn" id="rvWordWeekBtn">この週</button>
         <button class="seg-btn" id="rvWordAllBtn">全期間</button>
@@ -709,12 +782,8 @@
     </div>
 
     <div class="card">
-      <label class="field-label">5. 「試すこと」の結果</label>
-      <div id="rvTrials"></div>
-    </div>
-
-    <div class="card">
-      <label class="field-label">6. 次の週(<span id="rvNextWeekLabel"></span>)で試すこと</label>
+      <div class="step-head">次へ</div>
+      <label class="field-label">次の週(<span id="rvNextWeekLabel"></span>)で試すこと</label>
       <input type="text" id="rvNextTrial" placeholder="例: 頼みごとは断りやすい形で伝える" style="margin-bottom:0;">
       <p class="hint" style="margin:8px 0 0;">次の週は毎日、日記を書くときに「できた/できなかった」をチェックします</p>
     </div>
@@ -723,23 +792,44 @@
     <div id="rvStatus" class="status-line"></div>
 
     <div class="card">
+      <div class="step-head">読む</div>
       <label class="field-label">Claudeのチェック・過去の振り返り(新しい順)</label>
       <div id="rvFeedback"></div>
     </div>
   </section>
-  <!-- ③ 目標タブ(ありたい姿・年・月) -->
-  <section class="tab-panel" id="tab-goal">
+
+  <!-- ③ 目標タブ(月1回。考える順: 振り返る → 決める → 大きな目標 → 土台) -->
+  <section class="tab-panel steps" id="tab-goal">
+    <p class="tab-guide">このタブでやること:月をふり返り、次の月の目標を決める。年の目標とありたい姿はときどき見直す</p>
+
     <div class="card">
-      <label class="field-label">ありたい姿(5年後)</label>
-      <textarea id="glBeing" placeholder="5年後、どこで・誰と・どのように働き、何を大切に暮らしているか"></textarea>
-      <p class="hint" id="glBeingUpdated" style="margin:6px 0 0;"></p>
-      <label class="field-label rv-sub">なぜそうなりたいか(借り物の目標にしないため、3回掘る)</label>
-      <input type="text" id="glWhy1" placeholder="なぜ？ 1回目">
-      <input type="text" id="glWhy2" placeholder="それはなぜ？ 2回目">
-      <input type="text" id="glWhy3" placeholder="さらになぜ？ 3回目" style="margin-bottom:0;">
+      <div class="seg" style="margin-bottom:8px;">
+        <button class="seg-btn" id="glPrevMonthBtn">先月</button>
+        <button class="seg-btn" id="glThisMonthBtn">今月</button>
+        <button class="seg-btn" id="glNextMonthBtn">来月</button>
+      </div>
+      <div id="glMonthLabel" class="rv-week" style="margin:0;"></div>
+      <p class="hint" id="glMonthYearRef" style="margin:6px 0 0;"></p>
     </div>
 
     <div class="card">
+      <div class="step-head">振り返る</div>
+      <label class="field-label">月末のふり返り(できた理由・できなかった理由、次の月へ)</label>
+      <textarea id="glMonthMemo" style="min-height:70px;"></textarea>
+    </div>
+
+    <div class="card">
+      <div class="step-head">決める</div>
+      <label class="field-label">月の目標と進み具合 <span id="glMonthSummary" class="snippet"></span></label>
+      <div id="glMonthGoals"></div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <button class="reroll" id="glAddGoalBtn">＋ 目標を足す</button>
+        <button class="reroll" id="glCarryBtn" style="display:none;"></button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="step-head">大きな目標</div>
       <div class="seg" style="margin-bottom:8px;">
         <button class="seg-btn" id="glThisYearBtn">今年</button>
         <button class="seg-btn" id="glNextYearBtn">来年</button>
@@ -752,30 +842,26 @@
     </div>
 
     <div class="card">
-      <div class="seg" style="margin-bottom:8px;">
-        <button class="seg-btn" id="glPrevMonthBtn">先月</button>
-        <button class="seg-btn" id="glThisMonthBtn">今月</button>
-        <button class="seg-btn" id="glNextMonthBtn">来月</button>
-      </div>
-      <div id="glMonthLabel" class="rv-week" style="margin:0;"></div>
-      <p class="hint" id="glMonthYearRef" style="margin:6px 0 10px;"></p>
-      <label class="field-label">月の目標と進み具合 <span id="glMonthSummary" class="snippet"></span></label>
-      <div id="glMonthGoals"></div>
-      <div style="display:flex; gap:8px; flex-wrap:wrap;">
-        <button class="reroll" id="glAddGoalBtn">＋ 目標を足す</button>
-        <button class="reroll" id="glCarryBtn" style="display:none;"></button>
-      </div>
-      <label class="field-label rv-sub">月末のふり返り(できた理由・できなかった理由、次の月へ)</label>
-      <textarea id="glMonthMemo" style="min-height:70px;"></textarea>
+      <div class="step-head">土台</div>
+      <label class="field-label">ありたい姿(5年後)</label>
+      <textarea id="glBeing" placeholder="5年後、どこで・誰と・どのように働き、何を大切に暮らしているか"></textarea>
+      <p class="hint" id="glBeingUpdated" style="margin:6px 0 0;"></p>
+      <label class="field-label rv-sub">なぜそうなりたいか(借り物の目標にしないため、3回掘る)</label>
+      <input type="text" id="glWhy1" placeholder="なぜ？ 1回目">
+      <input type="text" id="glWhy2" placeholder="それはなぜ？ 2回目">
+      <input type="text" id="glWhy3" placeholder="さらになぜ？ 3回目" style="margin-bottom:0;">
     </div>
 
     <button class="save-btn" id="glSaveBtn">目標を保存</button>
     <div id="glStatus" class="status-line"></div>
   </section>
-  <!-- ④ 分析タブ(よく出る言葉・動けた日と動けなかった日) -->
-  <section class="tab-panel" id="tab-analysis">
+
+  <!-- ④ 分析タブ(いつでも。期間を選ぶ → 言葉 → 比べる) -->
+  <section class="tab-panel steps" id="tab-analysis">
+    <p class="tab-guide">このタブでやること:日記をまとめて見て、考え方の軸と「動ける日の条件」を探す</p>
+
     <div class="card">
-      <label class="field-label">分析する期間</label>
+      <div class="step-head">期間を選ぶ</div>
       <div class="seg">
         <button class="seg-btn" data-an-range="30">30日</button>
         <button class="seg-btn" data-an-range="90">90日</button>
@@ -785,13 +871,15 @@
     </div>
 
     <div class="card">
-      <label class="field-label">1. よく出る言葉(何日に出たか。考え方の軸の候補)</label>
+      <div class="step-head">言葉</div>
+      <label class="field-label">よく出る言葉(何日に出たか。考え方の軸の候補)</label>
       <div id="anWords"></div>
       <div id="anWordDays"></div>
     </div>
 
     <div class="card">
-      <label class="field-label">2. 動けた日と動けなかった日を比べる</label>
+      <div class="step-head">比べる</div>
+      <label class="field-label">動けた日と動けなかった日を比べる</label>
       <div class="seg" style="margin-bottom:10px;">
         <button class="seg-btn" data-an-basis="act">動けた？</button>
         <button class="seg-btn" data-an-basis="trial">試すこと</button>
@@ -830,7 +918,8 @@
       </div>
       <div id="viewDateList"></div>
       <pre id="viewContent" style="white-space:pre-wrap; font-size:0.9rem; display:none; font-family:inherit;"></pre>
-      <textarea id="viewEditArea" style="display:none; min-height:50vh;"></textarea>
+      <!-- 日本語の欄の目印(キーボードが日本語で出やすくなる。効くかは機種しだい) -->
+      <textarea id="viewEditArea" lang="ja" inputmode="text" autocapitalize="off" spellcheck="false" style="display:none; min-height:50vh;"></textarea>
       <div id="viewActions" style="display:none; gap:8px; margin-top:10px;">
         <button class="reroll" id="editEntryBtn">✏️ この日を編集</button>
         <button class="reroll" id="cancelEditBtn" style="display:none;">キャンセル</button>
@@ -878,13 +967,13 @@
   </div>
 </div>
 
-<script src="questions.js?v=20261125h"></script>
-<script src="jma-weather.js?v=20261125h"></script>
-<script src="app.js?v=20261125h"></script>
-<script src="review.js?v=20261125h"></script>
-<script src="goal.js?v=20261125h"></script>
-<script src="analysis.js?v=20261125h"></script>
-<script src="next.js?v=20261125h"></script>
-<script src="sound.js?v=20261125h"></script>
+<script src="questions.js?v=20261126a"></script>
+<script src="jma-weather.js?v=20261126a"></script>
+<script src="app.js?v=20261126a"></script>
+<script src="review.js?v=20261126a"></script>
+<script src="goal.js?v=20261126a"></script>
+<script src="analysis.js?v=20261126a"></script>
+<script src="next.js?v=20261126a"></script>
+<script src="sound.js?v=20261126a"></script>
 </body>
 </html>

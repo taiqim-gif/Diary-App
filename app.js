@@ -506,12 +506,14 @@ function mountWeather() {
   }
 }
 
-// 保存する日記に書く「天気」と「月齢」の行を作る
+// 保存する日記に書く「天気」と「月齢」の行を作る(1行に短くまとめる)
+// 例: - 天気: 雪 0℃/-4℃ 40% 石狩 ・ 月齢: 15.3 満月
 function weatherLines(dateStr) {
-  const lines = [];
-  if (!window.JmaWeather) return lines;
+  if (!window.JmaWeather) return [];
   const now = Date.now();
   const isToday = dateStr === todayStr();
+  let wxText = "";
+  let moonText = "";
 
   // 天気は、今日の日記のときだけ記録する(予報なので、過去の日には使えない)
   if (isToday && wx) {
@@ -520,31 +522,42 @@ function weatherLines(dateStr) {
       if (d && d.weathers && d.weathers.length) {
         const t = JmaWeather.days(d, now)[0];
         const parts = [];
-        if (t.text) parts.push(t.text);
-        if (t.max != null) parts.push(`最高${t.max}℃`);
-        if (t.min != null) parts.push(`最低${t.min}℃`);
+        // 天気は最初の一語だけ(「雪 で ふぶく …」→「雪」)
+        if (t.text) parts.push(t.text.trim().split(/[\s　]+/)[0]);
+        // 気温は「最高/最低」
+        if (t.max != null || t.min != null) {
+          const hi = t.max != null ? `${t.max}℃` : "―";
+          const lo = t.min != null ? `${t.min}℃` : "―";
+          parts.push(`${hi}/${lo}`);
+        }
+        // 降水確率は % だけ
         const pop = t.popsNow && t.popsNow[0] ? t.popsNow[0].v : null;
-        if (pop !== null && pop !== "") parts.push(`降水${pop}%`);
-        if (d.areaName) parts.push(`(${d.areaName})`);
+        if (pop !== null && pop !== "") parts.push(`${pop}%`);
+        // 地方名は短く(「石狩地方」→「石狩」)
+        if (d.areaName) parts.push(String(d.areaName).replace(/地方$/, ""));
         const old = now - Date.parse(d.fetchedAt) > 3 * 3600 * 1000;
         if (old) parts.push("※古い予報");
-        if (parts.length) lines.push(`- 天気: ${parts.join(" ")}`);
+        wxText = parts.join(" ");
       }
     } catch (e) {
       console.error(e);
     }
   }
 
-  // 月齢は計算なので、いつでも出せる(その日の日時で計算)
+  // 月齢は計算なので、いつでも出せる(その日の日時で計算)。名前だけ残す
   try {
     const when = new Date(document.getElementById("whenInput").value);
     const ms = isNaN(when.getTime()) ? now : when.getTime();
     const m = JmaWeather.moon(ms);
-    lines.push(`- 月齢: ${m.age} ${m.name}(${m.trend}、光っている割合${m.illum}%)`);
+    moonText = `${m.age} ${m.name}`;
   } catch (e) {
     console.error(e);
   }
-  return lines;
+
+  if (wxText && moonText) return [`- 天気: ${wxText} ・ 月齢: ${moonText}`];
+  if (wxText) return [`- 天気: ${wxText}`];
+  if (moonText) return [`- 月齢: ${moonText}`];
+  return [];
 }
 
 // ---------- 日記ファイル(1ファイル運用) ----------

@@ -142,20 +142,20 @@ async function collectNextTasks() {
     const yest = addDays(today, -1);
     // 昨日の分は、日記を書きはじめた後だけ出す(はじめて使う日に出さない)
     if (dates.length && !dates.includes(yest) && dates.some((d) => d < yest)) {
-      add({ id: "diary-" + yest, due: yest, prio: 3, title: "昨日の日記を書く", steps: diarySteps(yest) });
+      add({ id: "diary-" + yest, due: yest, prio: 3, when: "毎日", title: "昨日の日記を書く", steps: diarySteps(yest) });
     }
     if (!dates.includes(today)) {
-      add({ id: "diary-" + today, due: today, prio: 3, title: "今日の日記を書く", steps: diarySteps(today) });
+      add({ id: "diary-" + today, due: today, prio: 3, when: "毎日", title: "今日の日記を書く", steps: diarySteps(today) });
     }
   }
 
   // 2. 週の振り返り(先週の分がない／今週は土日から)
   if (!rvLast.content) {
-    add({ id: "review-" + lastWeek.key, due: dateKey(addDaysDate(lastWeek.end, -1)), prio: 2, title: `先週の振り返り(${lastWeek.key})`, steps: reviewSteps(-1) });
+    add({ id: "review-" + lastWeek.key, due: dateKey(addDaysDate(lastWeek.end, -1)), prio: 2, when: "毎週 土日", title: `先週の振り返り(${lastWeek.key})`, steps: reviewSteps(-1) });
   }
   const dow = now.getDay(); // 0=日 6=土
   if (!rvThis.content && (dow === 6 || dow === 0)) {
-    add({ id: "review-" + thisWeek.key, due: dateKey(addDaysDate(thisWeek.end, -1)), prio: 2, title: "今週の振り返り", steps: reviewSteps(0) });
+    add({ id: "review-" + thisWeek.key, due: dateKey(addDaysDate(thisWeek.end, -1)), prio: 2, when: "毎週 土日", title: "今週の振り返り", steps: reviewSteps(0) });
   }
 
   // 3. 月の見直し・4. 年の書き直し(目標が読めたときだけ)
@@ -174,22 +174,22 @@ async function collectNextTasks() {
     const thisM = monthKeyOf(now);
     const nextM = monthKeyOf(new Date(y, m + 1, 1));
     if (day >= 25 && !goalsFilled((months[nextM] || {}).goals)) {
-      add({ id: "month-" + nextM, due: `${thisM}-25`, prio: 1, title: "今月の見直し(来月の目標を決める)", steps: monthSteps(1) });
+      add({ id: "month-" + nextM, due: `${thisM}-25`, prio: 1, when: "毎月 25日〜", title: "今月の見直し(来月の目標を決める)", steps: monthSteps(1) });
     } else if (day <= 7 && !goalsFilled((months[thisM] || {}).goals)) {
-      add({ id: "month-" + thisM, due: `${thisM}-01`, prio: 1, title: "今月の目標を決める", steps: monthSteps(0) });
+      add({ id: "month-" + thisM, due: `${thisM}-01`, prio: 1, when: "毎月 1〜7日", title: "今月の目標を決める", steps: monthSteps(0) });
     }
     const hasYear = (k) => years[k] && String(years[k].goals || "").trim();
     if (m === 11 && day >= 20 && !hasYear(String(y + 1))) {
-      add({ id: "year-" + (y + 1), due: `${y}-12-20`, prio: 0, title: "ありたい姿の書き直し(来年の目標)", steps: yearSteps(1) });
+      add({ id: "year-" + (y + 1), due: `${y}-12-20`, prio: 0, when: "毎年 12/20〜", title: "ありたい姿の書き直し(来年の目標)", steps: yearSteps(1) });
     } else if (m === 0 && !hasYear(String(y))) {
-      add({ id: "year-" + y, due: `${y}-01-01`, prio: 0, title: "ありたい姿の書き直し(今年の目標)", steps: yearSteps(0) });
+      add({ id: "year-" + y, due: `${y}-01-01`, prio: 0, when: "毎年 1月", title: "ありたい姿の書き直し(今年の目標)", steps: yearSteps(0) });
     }
   }
 
   // 5. 規格外さん巡回(毎月1日から7日まで)
   if (now.getDate() <= 7) {
     const k = monthKeyOf(now);
-    add({ id: "patrol-" + k, due: `${k}-01`, prio: 4, title: "規格外さん巡回(月1回)", steps: patrolSteps() });
+    add({ id: "patrol-" + k, due: `${k}-01`, prio: 4, when: "毎月 1〜7日", title: "規格外さん巡回", steps: patrolSteps() });
   }
 
   // 6. Claudeのチェックが届いた(まだ読んでいないもの)
@@ -202,6 +202,7 @@ async function collectNextTasks() {
       id: "fb-" + unread.name,
       due: m ? m[0] : today,
       prio: 5,
+      when: "毎晩 22時",
       title: "Claudeのチェックが届きました",
       steps: [
         { text: `「${unread.name.replace(/\.md$/, "")}」を読む`, act: ["読む", () => openFeedback(unread)] },
@@ -229,6 +230,36 @@ async function openFeedback(f) {
   }
 }
 
+// ---------- 次の予定(定期作業のうち、一番近いもの) ----------
+
+const WEEK_JA = ["日", "月", "火", "水", "木", "金", "土"];
+
+// 明日以降で、一番近い定期作業を1つ返す { date, title }
+function nextScheduled(now = new Date()) {
+  const y = now.getFullYear();
+  const m = now.getMonth();
+  const d = now.getDate();
+  const list = [];
+  // 振り返り: 次の土曜日(今日が土曜なら来週の土曜)
+  const toSat = ((6 - now.getDay() + 7) % 7) || 7;
+  list.push({ date: new Date(y, m, d + toSat), title: "週の振り返り", prio: 2 });
+  // 月の見直し: 25日(今日が25日以降なら来月の25日)
+  list.push({ date: d < 25 ? new Date(y, m, 25) : new Date(y, m + 1, 25), title: "月の見直し", prio: 1 });
+  // 規格外さん巡回: 来月の1日
+  list.push({ date: new Date(y, m + 1, 1), title: "規格外さん巡回", prio: 4 });
+  // ありたい姿の書き直し: 12/20(過ぎていれば来年の12/20)
+  list.push({ date: m === 11 && d >= 20 ? new Date(y + 1, 11, 20) : new Date(y, 11, 20), title: "ありたい姿の書き直し", prio: 0 });
+  list.sort((a, b) => a.date - b.date || a.prio - b.prio);
+  return list[0];
+}
+
+// 「次は 11/28(土) 週の振り返り」の文字を作る
+function nextScheduleText() {
+  const n = nextScheduled();
+  const md = `${n.date.getMonth() + 1}/${n.date.getDate()}(${WEEK_JA[n.date.getDay()]})`;
+  return `次の予定: ${md} ${n.title}`;
+}
+
 // ---------- 画面 ----------
 
 function renderNext() {
@@ -237,7 +268,9 @@ function renderNext() {
   const t = nextTasks[0];
   if (!t) {
     box.className = "card next-card none";
-    box.innerHTML = `<div class="next-label">次にやること</div><div class="next-none">今はありません ✓</div>`;
+    box.innerHTML =
+      `<div class="next-label">次にやること</div><div class="next-none">今はありません ✓</div>` +
+      `<div class="next-sched">${escapeHtml(nextScheduleText())}</div>`;
     return;
   }
   const st = nextState();
@@ -246,7 +279,7 @@ function renderNext() {
   let html =
     `<button class="next-head" id="nextHeadBtn" aria-expanded="${nextOpen}">` +
     `<span class="next-label">次にやること${rest ? `<span class="next-rest">ほかに${rest}件</span>` : ""}</span>` +
-    `<span class="next-title">${escapeHtml(t.title)}</span>` +
+    `<span class="next-title">${t.when ? `<span class="next-when">${escapeHtml(t.when)}</span>` : ""}${escapeHtml(t.title)}</span>` +
     `<span class="next-prog">手順 ${doneCount}/${t.steps.length}　${nextOpen ? "▲ とじる" : "▼ タップで手順"}</span>` +
     `</button>`;
   if (nextOpen) {
@@ -265,6 +298,7 @@ function renderNext() {
     if (left > 0) html += `<div class="next-left">このあと ${left} 手順</div>`;
     if (doneCount > 0) html += `<button class="next-back" id="nextBackBtn">1つ戻す</button>`;
   }
+  html += `<div class="next-sched next-sched-in">${escapeHtml(nextScheduleText())}</div>`;
   box.className = "card next-card";
   box.innerHTML = html;
 

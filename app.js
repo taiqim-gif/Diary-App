@@ -220,6 +220,8 @@ function closeSettingsNoSave() {
 // ---------- タブ ----------
 
 function showTab(name) {
+  // 開いているタブを <html> に書いておく(カラフルの見た目で、タブの色に変えるため)
+  document.documentElement.dataset.tab = name;
   document.querySelectorAll(".tab-btn").forEach((b) => {
     b.classList.toggle("active", b.dataset.tab === name);
   });
@@ -1138,6 +1140,7 @@ function themeList() {
     ["green", "パステルグリーン", "#336b4c"],
     ["wa", "和風(藍・朱)", "linear-gradient(135deg, #264e70 50%, #c0462b 50%)"],
     ["night", "夜", "linear-gradient(135deg, #0e1524 50%, #d9b86a 50%)"],
+    ["colorful", "カラフル(タブで色分け)", "conic-gradient(#2f5fc4 0 25%, #b8481a 0 50%, #25793f 0 75%, #7b3d9b 0)"],
     ["season", `季節で自動(今月: ${s[0]})`, s[1]],
   ];
 }

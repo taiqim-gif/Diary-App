@@ -141,6 +141,13 @@ async function collectNextTasks() {
   } catch (e) {
     xPatrol = null;
   }
+  // note巡回の状態(読めなければ表示しない)
+  try {
+    const nRaw = await githubGetFile(s, "x-patrol/note/state.json");
+    notePatrol = nRaw.content ? JSON.parse(nRaw.content) : null;
+  } catch (e) {
+    notePatrol = null;
+  }
 
   // 1. 日記(昨日と今日。書いていない日)
   if (diary !== null) {
@@ -272,7 +279,90 @@ function xPatrolText() {
   }
   const st = String(xPatrol.last_status || "");
   const mark = st.startsWith("ok") ? " ✓" : st ? ` ⚠ ${st}` : "";
-  return `X巡回(毎朝5件): ${rest}${last}${mark}`;
+  return `X巡回(毎朝3回): ${rest}${last}${mark}`;
+}
+
+// note巡回の状態: 「note巡回(1日3記事): 残り331記事・最終 11/27 7:12 ✓」
+let notePatrol = null;
+function notePatrolText() {
+  if (!notePatrol) return "";
+  const r = notePatrol.remaining;
+  const rest = r === 0 ? "読み終わり" : `残り${r}記事`;
+  let last = "";
+  if (notePatrol.last_run) {
+    const d = new Date(notePatrol.last_run);
+    if (!isNaN(d)) last = `・最終 ${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${pad2(d.getMinutes())}`;
+  }
+  const st = String(notePatrol.last_status || "");
+  const mark = st.startsWith("ok") ? " ✓" : st ? ` ⚠ ${st}` : "";
+  return `note巡回(1日3記事): ${rest}${last}${mark}`;
+}
+
+// X・note の行(右に「読む」ボタン)を作る
+function patrolRowsHtml(extraClass) {
+  let h = "";
+  if (xPatrolText()) h += `<div class="next-xp ${extraClass}"><span>${escapeHtml(xPatrolText())}</span><button type="button" class="xp-read" data-kind="x">読む</button></div>`;
+  if (notePatrolText()) h += `<div class="next-xp ${extraClass}"><span>${escapeHtml(notePatrolText())}</span><button type="button" class="xp-read" data-kind="note">読む</button></div>`;
+  return h;
+}
+
+function bindPatrolButtons(box) {
+  box.querySelectorAll(".xp-read").forEach((b) => b.addEventListener("click", () => openPatrolReader(b.dataset.kind)));
+}
+
+// ---------- 巡回の記録を読む画面 ----------
+// x-patrol/posts/YYYY-MM.json(X) と x-patrol/note/YYYY-MM.json(note) を、新しい順に出す
+async function openPatrolReader(kind) {
+  const s = loadSettings();
+  const ov = document.createElement("div");
+  ov.className = "xp-overlay";
+  ov.innerHTML = `<div class="xp-panel"><div class="xp-top"><b>${kind === "x" ? "X巡回の記録" : "note巡回の記録"}</b><button type="button" class="xp-close">✕ 閉じる</button></div><div class="xp-body">読み込み中…</div></div>`;
+  document.body.appendChild(ov);
+  const close = () => ov.remove();
+  ov.querySelector(".xp-close").addEventListener("click", close);
+  ov.addEventListener("click", (e) => { if (e.target === ov) close(); });
+
+  // 今月と先月の分を読む
+  const now = new Date();
+  const months = [monthKeyOf(now), monthKeyOf(new Date(now.getFullYear(), now.getMonth() - 1, 1))];
+  const folder = kind === "x" ? "x-patrol/posts" : "x-patrol/note";
+  let list = [];
+  for (const m of months) {
+    try {
+      const f = await githubGetFile(s, `${folder}/${m}.json`);
+      if (f.content) list = list.concat(JSON.parse(f.content));
+    } catch (e) { /* その月の記録がなければ飛ばす */ }
+  }
+  list.sort((a, b) => String(b.read_at || b.date).localeCompare(String(a.read_at || a.date)));
+  const body = ov.querySelector(".xp-body");
+  if (!list.length) {
+    body.textContent = "まだ記録がありません";
+    return;
+  }
+  const fmt = (iso) => {
+    const d = new Date(iso);
+    return isNaN(d) ? "" : `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${pad2(d.getMinutes())}`;
+  };
+  const para = (t) => escapeHtml(t).replace(/\n/g, "<br>");
+  let h = "";
+  list.forEach((r) => {
+    h += `<div class="xp-item"><div class="xp-date">${fmt(r.date)}${r.paid ? " ・有料記事(一部のみ)" : ""}</div>`;
+    if (r.title) h += `<div class="xp-title">${escapeHtml(r.title)}</div>`;
+    if (r.summary) {
+      // 長い文章: 要約を出し、全文は「全文を開く」で
+      h += `<div class="xp-sum">${para(r.summary)}</div>`;
+      if (r.point) h += `<div class="xp-meta">要点: ${escapeHtml(r.point)}</div>`;
+      if (r.policy) h += `<div class="xp-meta">行動方針: ${escapeHtml(r.policy)}</div>`;
+      if (r.quote) h += `<div class="xp-meta">言葉: 「${escapeHtml(r.quote)}」</div>`;
+      h += `<details class="xp-full"><summary>全文を開く</summary><div>${para(r.text)}</div></details>`;
+    } else {
+      // 短い文章は本文そのまま(長いのに要約がまだのものは「要約待ち」)
+      h += `<div class="xp-text">${para(r.text)}</div>`;
+      if (r.long) h += `<div class="xp-meta">(要約待ち)</div>`;
+    }
+    h += `<a class="xp-link" href="${escapeHtml(r.url)}" target="_blank" rel="noopener">${kind === "x" ? "Xで開く" : "noteで開く(スキはここで)"}</a></div>`;
+  });
+  body.innerHTML = h;
 }
 
 // 「次は 11/28(土) 週の振り返り」の文字を作る
@@ -293,7 +383,8 @@ function renderNext() {
     box.innerHTML =
       `<div class="next-label">次にやること</div><div class="next-none">今はありません ✓</div>` +
       `<div class="next-sched">${escapeHtml(nextScheduleText())}</div>` +
-      (xPatrolText() ? `<div class="next-xp">${escapeHtml(xPatrolText())}</div>` : "");
+      patrolRowsHtml("");
+    bindPatrolButtons(box);
     return;
   }
   const st = nextState();
@@ -332,9 +423,10 @@ function renderNext() {
   html += nextOpen
     ? `<button type="button" class="next-sched next-sched-in next-sched-btn" id="nextSchedBtn"><span>${escapeHtml(nextScheduleText())}</span><span class="next-close">▲ 閉じる</span></button>`
     : `<div class="next-sched next-sched-in">${escapeHtml(nextScheduleText())}</div>`;
-  if (xPatrolText()) html += `<div class="next-xp next-xp-in">${escapeHtml(xPatrolText())}</div>`;
+  html += patrolRowsHtml("next-xp-in");
   box.className = "card next-card";
   box.innerHTML = html;
+  bindPatrolButtons(box);
 
   document.getElementById("nextHeadBtn").addEventListener("click", () => {
     nextOpen = !nextOpen;

@@ -217,6 +217,22 @@
   /* X巡回の状態(1行・小さめ) */
   .next-xp { margin-top: 2px; font-size: 0.78rem; color: var(--muted); }
   .next-xp-in { margin: 0; padding: 0 14px 8px; }
+  /* 巡回の「読む」ボタンと、記録を読む画面 */
+  .next-xp { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .xp-read { flex: none; padding: 3px 10px; border: 1px solid var(--accent); border-radius: 999px; background: var(--card); color: var(--accent); font: inherit; font-size: 0.78rem; font-weight: 600; cursor: pointer; }
+  .xp-overlay { position: fixed; inset: 0; z-index: 1000; background: rgba(0,0,0,0.45); display: flex; justify-content: center; align-items: stretch; padding: 16px; }
+  .xp-panel { width: 100%; max-width: 640px; background: var(--card); color: var(--text); border-radius: var(--radius); display: flex; flex-direction: column; overflow: hidden; }
+  .xp-top { display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; border-bottom: 1px solid var(--border); }
+  .xp-close { border: none; background: none; color: var(--accent); font: inherit; font-weight: 600; cursor: pointer; }
+  .xp-body { overflow-y: auto; padding: 8px 14px 24px; line-height: 1.6; }
+  .xp-item { padding: 12px 0; border-bottom: 1px dashed var(--border); }
+  .xp-date { font-size: 0.78rem; color: var(--muted); }
+  .xp-title { font-weight: 700; margin: 2px 0 4px; }
+  .xp-sum, .xp-text { font-size: 0.95rem; }
+  .xp-meta { font-size: 0.85rem; color: var(--muted); margin-top: 4px; }
+  .xp-full { margin-top: 6px; font-size: 0.9rem; }
+  .xp-full summary { color: var(--accent); cursor: pointer; font-weight: 600; }
+  .xp-link { display: inline-block; margin-top: 6px; font-size: 0.85rem; color: var(--accent); }
   .next-steps { margin: 0; padding: 10px 14px 4px 34px; }
   .next-steps li { margin-bottom: 8px; line-height: 1.5; }
   .next-steps li.done { color: var(--muted); list-style: none; margin-left: -18px; }
